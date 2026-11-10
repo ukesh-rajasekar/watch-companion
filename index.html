@@ -93,7 +93,7 @@
   .legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
   nav.tabs {
-    position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr);
+    position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(6, 1fr);
     background: var(--card); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); z-index: 5;
   }
   nav.tabs button { border: 0; background: none; min-height: 50px; padding: 4px 2px; font-size: 11px; color: var(--muted);
@@ -121,6 +121,34 @@
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
   .seg button { border: 0; border-radius: 0; min-height: 34px; padding: 6px 12px; font-size: 13px; }
   .seg button.on { background: var(--accent); color: var(--accent-text); }
+  nav.tabs button { font-size: 10.5px; }
+  /* Run coach */
+  :root { --run: #158a48; --walk: #2f6bff; --warm: #b26a00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --run: #4cc785; --walk: #5b8cff; --warm: #f0a640; } }
+  :root[data-theme="dark"] { --run: #4cc785; --walk: #5b8cff; --warm: #f0a640; }
+  .next-title { font-size: 22px; font-weight: 800; margin: 2px 0; }
+  .segbar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; gap: 1px; margin: 10px 0 4px; background: var(--soft); }
+  .segbar i { display: block; height: 100%; }
+  .segbar i.run { background: var(--run); } .segbar i.walk { background: var(--walk); opacity: .55; }
+  .segbar i.warm, .segbar i.cool { background: var(--warm); opacity: .45; }
+  .weeks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .wk { background: var(--soft); border-radius: 9px; padding: 7px 8px; font-size: 12px; }
+  .wk b { display: block; font-size: 13px; }
+  .wk .dots { letter-spacing: 2px; color: var(--muted); }
+  .wk .dots .on { color: var(--run); }
+  .bar { height: 8px; background: var(--soft); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--run); }
+  .runlive { position: fixed; inset: 0; z-index: 25; background: var(--bg); display: none; flex-direction: column;
+             padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  .runlive.show { display: flex; }
+  .runlive .phase { font-size: 15px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; text-align: center; margin-top: 8px; }
+  .runlive .count { font-size: clamp(72px, 26vw, 130px); font-weight: 800; text-align: center; line-height: 1; font-variant-numeric: tabular-nums; margin: 6px 0; }
+  .runlive .then { text-align: center; color: var(--muted); font-size: 14px; min-height: 20px; }
+  .runlive .grid2 { margin-top: auto; }
+  .runlive .stat .v { font-size: 26px; }
+  .runlive.ph-run { --phase: var(--run); } .runlive.ph-walk { --phase: var(--walk); } .runlive.ph-warm, .runlive.ph-cool, .runlive.ph-free { --phase: var(--warm); }
+  .runlive .phase, .runlive .count { color: var(--phase, var(--text)); }
+  .hrwarn { color: var(--bad) !important; }
 </style>
 </head>
 <body>
@@ -188,6 +216,53 @@
       <h2>Workouts <button class="small" data-act="syncWorkouts">Sync</button></h2>
       <div id="h-workouts" class="list"></div>
       <p class="hint">Start a workout (Running, Cycling…) on the watch itself. When it ends, sync here to see it.</p>
+    </div>
+  </section>
+
+  <!-- RUN COACH -->
+  <section class="tab" id="tab-run">
+    <div class="card">
+      <h2>Next session <span class="muted" id="rn-week" style="text-transform:none;letter-spacing:0"></span></h2>
+      <div class="next-title" id="rn-title">–</div>
+      <div class="muted" id="rn-desc" style="font-size:14px"></div>
+      <div class="segbar" id="rn-bar"></div>
+      <div class="legend"><span><i style="background:var(--run)"></i>Run</span><span><i style="background:var(--walk);opacity:.55"></i>Walk</span><span><i style="background:var(--warm);opacity:.45"></i>Warm-up / cool-down</span></div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" style="flex:2" id="rn-start">Start session</button>
+        <button style="flex:1" id="rn-free">Free run</button>
+      </div>
+      <p class="hint">Run slowly enough to talk. Rest at least a day between sessions; repeat a week if it felt hard.</p>
+    </div>
+
+    <div class="card">
+      <h2>This week</h2>
+      <div class="grid3">
+        <div class="stat"><div class="v" id="rw-runs">0</div><div class="k">runs</div></div>
+        <div class="stat"><div class="v" id="rw-min">0</div><div class="k">minutes</div></div>
+        <div class="stat"><div class="v" id="rw-km">0.0</div><div class="k">km</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Plan: walk to 30-minute run <span class="muted" id="rp-pct" style="text-transform:none;letter-spacing:0"></span></h2>
+      <div class="bar"><i id="rp-bar" style="width:0"></i></div>
+      <div class="weeks" id="rp-weeks" style="margin-top:10px"></div>
+      <p class="hint">8 weeks, 3 sessions a week. A session counts when you finish at least 90% of its running.</p>
+    </div>
+
+    <div class="card">
+      <h2>Runs</h2>
+      <div id="run-list" class="list"></div>
+    </div>
+
+    <div class="card">
+      <h2>Coach</h2>
+      <div class="switch"><span>Buzz the watch at every change</span><input type="checkbox" id="c-watch" checked></div>
+      <div class="switch"><span>Spoken cues on the phone</span><input type="checkbox" id="c-voice" checked></div>
+      <div class="switch"><span>Use phone GPS for distance</span><input type="checkbox" id="c-gps" checked></div>
+      <div class="switch"><span>"Slow down" alert above</span>
+        <select id="c-hrmax" style="width:auto"><option value="0.85">85% of max HR</option><option value="0.9" selected>90% of max HR</option><option value="0">Off</option></select></div>
+      <p class="hint" id="c-hrinfo">Max heart rate is estimated as 220 minus your age (Settings → Profile).</p>
     </div>
   </section>
 
@@ -378,12 +453,34 @@
 <nav class="tabs" aria-label="Sections">
   <button data-tab="today" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Today</button>
   <button data-tab="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>History</button>
+  <button data-tab="run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="14" cy="4" r="2"/><path d="M8 21l3-6 3 2v4M6 12l3-4 4 1 3 4 3 1M11 15l-1-4"/></svg>Run</button>
   <button data-tab="music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Music</button>
   <button data-tab="tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Messages</button>
   <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
 </nav>
 
 <div class="toast" id="toast"></div>
+<div class="runlive" id="run-live" role="dialog" aria-label="Run in progress">
+  <div class="row" style="justify-content:space-between">
+    <span class="muted" id="rl-name">Session</span>
+    <span class="muted" id="rl-elapsed" style="font-variant-numeric:tabular-nums">0:00</span>
+  </div>
+  <div class="segbar" id="rl-bar"></div>
+  <div class="phase" id="rl-phase">Warm-up walk</div>
+  <div class="count" id="rl-count">5:00</div>
+  <div class="then" id="rl-then"></div>
+  <div class="grid2">
+    <div class="stat"><div class="v" id="rl-dist">0.00</div><div class="k" id="rl-distk">km</div></div>
+    <div class="stat"><div class="v" id="rl-pace">–</div><div class="k">pace /km</div></div>
+    <div class="stat"><div class="v" id="rl-hr" style="color:var(--heart)">–</div><div class="k" id="rl-hrk">heart rate</div></div>
+    <div class="stat"><div class="v" id="rl-steps">–</div><div class="k">steps</div></div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button style="flex:1" id="rl-pause">Pause</button>
+    <button style="flex:1" id="rl-skip">Skip</button>
+    <button class="primary" style="flex:1" id="rl-end">Finish</button>
+  </div>
+</div>
 <div class="overlay" id="ring-ov">
   <div class="card">
     <h2 style="justify-content:center">Find phone</h2>
@@ -620,6 +717,77 @@ const SPORTS = { 1: "Running", 2: "Cycling", 3: "Rope skipping", 4: "Swimming", 
   25: "Free training", 26: "Open-water swim", 27: "Pool swim" };
 
 if (typeof module !== "undefined") module.exports = { Frames, decodeReply, pbRead, crc16, ChunkJoiner, parseHealthBlob, localSecs, SPORTS };
+</script>
+
+<script id="runlogic">
+// =====================================================================================
+// Run coach logic (pure functions, tested separately)
+// Plan: 8 weeks x 3 sessions, from 1-minute run intervals to a continuous 30-minute run.
+// Every session: 5-minute warm-up walk, the week's intervals, 5-minute cool-down walk.
+// =====================================================================================
+// n repeats of a run/walk pair, without the last walk (the cool-down walk follows)
+const rep = (n, segs) => Array.from({ length: n }, () => segs).flat().slice(0, -1);
+const PLAN_WEEKS = [
+  { w: 1, note: "Run 1 min, walk 90 s, eight times", main: rep(8, [["run", 60], ["walk", 90]]) },
+  { w: 2, note: "Run 90 s, walk 2 min, six times", main: rep(6, [["run", 90], ["walk", 120]]) },
+  { w: 3, note: "Run 90 s and 3 min with walks between, twice", main: rep(2, [["run", 90], ["walk", 90], ["run", 180], ["walk", 180]]) },
+  { w: 4, note: "Run 3, 5 and 3 min with walks between", main: [["run", 180], ["walk", 90], ["run", 300], ["walk", 150], ["run", 180]] },
+  { w: 5, note: "Run 5 min, walk 3 min, three times", main: rep(3, [["run", 300], ["walk", 180]]) },
+  { w: 6, note: "Run 10 min, walk 3 min, run 10 min", main: [["run", 600], ["walk", 180], ["run", 600]] },
+  { w: 7, note: "Run 25 minutes without stopping", main: [["run", 1500]] },
+  { w: 8, note: "Run 30 minutes without stopping", main: [["run", 1800]] },
+];
+function sessionSegs(week) {
+  const wk = PLAN_WEEKS[week - 1];
+  return [["warm", 300], ...wk.main, ["cool", 300]];
+}
+const sessionId = (week, day) => `W${week}D${day}`;
+const totalSecs = segs => segs.reduce((a, s) => a + s[1], 0);
+const runSecs = segs => segs.filter(s => s[0] === "run").reduce((a, s) => a + s[1], 0);
+function nextSession(done) {
+  for (const wk of PLAN_WEEKS) for (let d = 1; d <= 3; d++) if (!done.includes(sessionId(wk.w, d))) return { week: wk.w, day: d };
+  return null;
+}
+// Where are we in a session after `t` seconds?  -> {i, seg, left, next}
+function segmentAt(segs, t) {
+  let acc = 0;
+  for (let i = 0; i < segs.length; i++) {
+    acc += segs[i][1];
+    if (t < acc) return { i, seg: segs[i], left: acc - t, next: segs[i + 1] || null };
+  }
+  return { i: segs.length, seg: null, left: 0, next: null };
+}
+function haversine(a, b) {
+  const R = 6371000, r = x => x * Math.PI / 180;
+  const dLat = r(b.lat - a.lat), dLon = r(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+// GPS track -> metres. Skips fixes worse than 30 m and jitter under 3 m; drops glitches that would mean moving faster than 8 m/s.
+function trackDistance(points) {
+  let d = 0, last = null;
+  for (const p of points) {
+    if (p.acc > 30) continue;
+    if (!last) { last = p; continue; }
+    const m = haversine(last, p), dt = (p.t - last.t) / 1000;
+    if (m < 3) continue;
+    if (dt > 0 && m / dt > 8) continue;
+    d += m; last = p;
+  }
+  return d;
+}
+// Running stride estimate from height when GPS is unavailable (about 0.45 x height for an easy jog/walk mix)
+const strideMetres = heightCm => Math.max(0.5, Math.min(1.2, heightCm * 0.0045));
+const fmtClock = s => { s = Math.max(0, Math.round(s)); const m = Math.floor(s / 60); return (m >= 60 ? Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0") : m) + ":" + String(s % 60).padStart(2, "0"); };
+const fmtPace = (secs, metres) => (metres < 50 ? "–" : fmtClock(secs / (metres / 1000)));
+const SEG_LABEL = { warm: "Warm-up walk", run: "Run", walk: "Walk", cool: "Cool-down walk", free: "Free run" };
+function spoken(seg) {
+  if (!seg) return "";
+  const m = Math.floor(seg[1] / 60), s = seg[1] % 60;
+  const dur = (m ? m + (m === 1 ? " minute" : " minutes") : "") + (m && s ? " and " : "") + (s ? s + " seconds" : "");
+  return { warm: "Warm up. Walk for " + dur, run: "Run for " + dur, walk: "Walk for " + dur, cool: "Cool down. Walk for " + dur }[seg[0]];
+}
+if (typeof module !== "undefined") module.exports = { PLAN_WEEKS, sessionSegs, sessionId, totalSecs, runSecs, nextSession, segmentAt, haversine, trackDistance, strideMetres, fmtClock, fmtPace, spoken };
 </script>
 
 <script>
@@ -1062,7 +1230,7 @@ $("#wx-auto").addEventListener("click", () => {
 // ---------- Settings persistence ----------
 // Default the phone type to the device this page is running on
 if (!/iPhone|iPad|iPod/.test(navigator.userAgent)) $("#s-phone").value = "1";
-const SETTINGS_IDS = ["s-phone", "s-timefmt", "s-units", "s-bright", "s-raise", "p-sex", "p-age", "p-h", "p-w", "p-goal", "s-hrauto", "s-hrhi", "s-hrlo",
+const SETTINGS_IDS = ["c-watch", "c-voice", "c-gps", "c-hrmax", "s-phone", "s-timefmt", "s-units", "s-bright", "s-raise", "p-sex", "p-age", "p-h", "p-w", "p-goal", "s-hrauto", "s-hrhi", "s-hrlo",
   "r-sit", "r-sitmin", "r-sitfrom", "r-sitto", "r-noon", "d-on", "d-from", "d-to", "wx-now", "wx-lo", "wx-hi", "wx-code"];
 const savedS = store.get("settings", {});
 SETTINGS_IDS.forEach(id => { const e = document.getElementById(id); if (savedS[id] === undefined) return; e.type === "checkbox" ? (e.checked = savedS[id]) : (e.value = savedS[id]); });
@@ -1127,11 +1295,176 @@ function applyTheme(t) {
 $$("#theme-seg button").forEach(b => b.addEventListener("click", () => { store.set("theme", b.dataset.th); applyTheme(b.dataset.th); }));
 applyTheme(store.get("theme", ""));
 
+// ---------- Run coach ----------
+data.runs ||= []; data.planDone ||= [];
+const segBarHtml = segs => { const T = totalSecs(segs); return segs.map(s => `<i class="${s[0]}" style="flex:${s[1] / T}"></i>`).join(""); };
+const maxHr = () => 220 - (+((store.get("profile", {}) || {}).age) || +$("#p-age").value || 30);
+
+const Run = {
+  active: false,
+  start(segs, name, id) {
+    unlockAudio();
+    Object.assign(this, { active: true, segs, name, id, elapsed: 0, resumedAt: Date.now(), paused: false, points: [], hr: [],
+      steps0: null, steps: null, segIdx: -1, lastHrPoll: 0, lastStepPoll: 0, lastFreeCue: 0, hrWarnAt: 0, startedAt: Date.now() });
+    $("#rl-name").textContent = name;
+    $("#rl-bar").innerHTML = segs ? segBarHtml(segs) : "";
+    $("#rl-bar").hidden = !segs;
+    $("#run-live").classList.add("show");
+    this.wake();
+    if (chk("c-gps") && navigator.geolocation) {
+      try {
+        this.geo = navigator.geolocation.watchPosition(
+          p => { if (!this.paused) this.points.push({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() }); },
+          () => { this.geoFailed = true; }, { enableHighAccuracy: true, maximumAge: 0 });
+      } catch { this.geoFailed = true; }
+    }
+    listeners.push(this.onFrame);
+    if (chCmd) send(Frames.query(40), { quiet: true });
+    if (!segs) this.cue("Go", "Free run started", "Free run started. Go at an easy pace.");
+    this.timer = setInterval(() => this.tick(), 500);
+    this.tick();
+  },
+  onFrame: r => {
+    if (!Run.active) return;
+    if (r.steps) { if (Run.steps0 == null) Run.steps0 = r.steps.steps; Run.steps = r.steps.steps; }
+    const v = r.hrs ? r.hrs.now : r.hrValue;
+    if (v && v !== 255 && v >= 30 && v <= 230) { Run.hr.push(v); Run.showHr(v); }
+  },
+  t() { return this.elapsed + (this.paused ? 0 : (Date.now() - this.resumedAt) / 1000); },
+  tick() {
+    const t = this.t();
+    $("#rl-elapsed").textContent = fmtClock(t);
+    if (this.segs) {
+      const at = segmentAt(this.segs, t);
+      if (!at.seg) { this.finish(true); return; }
+      if (at.i !== this.segIdx) {
+        this.segIdx = at.i;
+        const s = at.seg, label = SEG_LABEL[s[0]];
+        const runsLeft = this.segs.slice(at.i).filter(x => x[0] === "run").length;
+        $("#run-live").className = "runlive show ph-" + s[0];
+        $("#rl-phase").textContent = label;
+        if (at.i > 0 || t < 2) this.cue(s[0] === "run" ? "RUN" : s[0] === "walk" ? "WALK" : label,
+          `${fmtClock(s[1])}${s[0] === "run" ? ` · ${runsLeft} run${runsLeft === 1 ? "" : "s"} left` : ""}`, spoken(s));
+      }
+      $("#rl-count").textContent = fmtClock(at.left);
+      $("#rl-then").textContent = at.next ? "Then " + SEG_LABEL[at.next[0]].toLowerCase() + " " + fmtClock(at.next[1]) : "Last one";
+      if (Math.round(at.left) === 10 && !this.warned10) { this.warned10 = true; beep(); } else if (Math.round(at.left) !== 10) this.warned10 = false;
+    } else {
+      $("#run-live").className = "runlive show ph-free";
+      $("#rl-phase").textContent = "Free run"; $("#rl-count").textContent = fmtClock(t); $("#rl-then").textContent = "Updates every 5 minutes";
+      if (t - this.lastFreeCue >= 300 && t > 5) {
+        this.lastFreeCue = Math.floor(t / 300) * 300;
+        const d = this.distance();
+        this.cue(fmtClock(t), `${(d.m / 1000).toFixed(2)} km · ${fmtPace(t, d.m)}/km`, `${Math.round(t / 60)} minutes. ${(d.m / 1000).toFixed(1)} kilometres.`);
+      }
+    }
+    const d = this.distance();
+    $("#rl-dist").textContent = (d.m / 1000).toFixed(2); $("#rl-distk").textContent = d.src === "gps" ? "km (GPS)" : d.src === "steps" ? "km (from steps)" : "km";
+    $("#rl-pace").textContent = fmtPace(t, d.m);
+    $("#rl-steps").textContent = this.steps != null && this.steps0 != null ? (this.steps - this.steps0).toLocaleString() : "–";
+    // Poll the watch: heart rate every 15 s, steps every 30 s
+    const now = Date.now();
+    if (chCmd && !this.paused && now - this.lastHrPoll > 15000) { this.lastHrPoll = now; send(Frames.liveHr(), { quiet: true }).catch(() => {}); }
+    if (chCmd && !this.paused && now - this.lastStepPoll > 30000) { this.lastStepPoll = now; send(Frames.query(40), { quiet: true }).catch(() => {}); }
+  },
+  distance() {
+    if (this.points.length > 1) return { m: trackDistance(this.points), src: "gps" };
+    if (this.steps != null && this.steps0 != null) return { m: (this.steps - this.steps0) * strideMetres(+$("#p-h").value || 165), src: "steps" };
+    return { m: 0, src: "" };
+  },
+  showHr(v) {
+    $("#rl-hr").textContent = v;
+    const lim = +$("#c-hrmax").value, max = maxHr();
+    const hot = lim > 0 && v > max * lim;
+    $("#rl-hr").classList.toggle("hrwarn", hot);
+    $("#rl-hrk").textContent = `heart rate · ${Math.round(v / max * 100)}% of max`;
+    if (hot && Date.now() - this.hrWarnAt > 60000) { this.hrWarnAt = Date.now(); this.cue("SLOW DOWN", `Heart rate ${v}`, "Heart rate is high. Slow down, or walk for a bit."); }
+  },
+  cue(title, body, speech) {
+    beep(); setTimeout(beep, 250);
+    if (chk("c-voice") && speech && window.speechSynthesis) { try { speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance(speech)); } catch {} }
+    if (chk("c-watch") && chCmd) send(Frames.notify(title, body), { quiet: true, timeout: 3000 }).catch(() => {});
+  },
+  async wake() { try { this.lock = await navigator.wakeLock.request("screen"); } catch {} },
+  pause() {
+    if (!this.active) return;
+    if (this.paused) { this.paused = false; this.resumedAt = Date.now(); $("#rl-pause").textContent = "Pause"; this.cue("Resumed", "Keep going", "Resumed."); }
+    else { this.elapsed = this.t(); this.paused = true; $("#rl-pause").textContent = "Resume"; this.cue("Paused", "Tap Resume to go on", "Paused."); }
+  },
+  skip() { if (!this.segs || this.paused) return; const at = segmentAt(this.segs, this.t()); if (at.seg) this.elapsed += at.left + 0.01; },
+  finish(completedAll) {
+    if (!this.active) return;
+    const t = this.t(); this.active = false;
+    clearInterval(this.timer); listeners = listeners.filter(f => f !== this.onFrame);
+    if (this.geo != null) navigator.geolocation.clearWatch(this.geo); this.geo = null;
+    try { this.lock && this.lock.release(); } catch {}
+    $("#run-live").classList.remove("show");
+    if (t < 30) { toast("Run discarded (under 30 seconds)"); return; }
+    // running seconds actually done
+    let ran = 0;
+    if (this.segs) { let acc = 0; for (const s of this.segs) { if (s[0] === "run") ran += Math.max(0, Math.min(s[1], t - acc)); acc += s[1]; } }
+    const d = this.distance();
+    const rec = { start: this.startedAt, name: this.name, id: this.id, secs: Math.round(t), ranSecs: Math.round(ran), m: Math.round(d.m), src: d.src,
+                  steps: this.steps != null && this.steps0 != null ? this.steps - this.steps0 : null,
+                  avgHr: this.hr.length ? Math.round(this.hr.reduce((a, b) => a + b, 0) / this.hr.length) : null, maxHr: this.hr.length ? Math.max(...this.hr) : null };
+    rec.done = !!(this.id && ran >= 0.9 * runSecs(this.segs));
+    if (rec.done && !data.planDone.includes(this.id)) data.planDone.push(this.id);
+    data.runs.unshift(rec); saveData(); renderRun();
+    const msg = rec.done ? "Session complete" : this.id ? "Run saved" : "Free run saved";
+    this.cue("Done", `${fmtClock(rec.secs)} · ${(rec.m / 1000).toFixed(2)} km`, `${msg}. ${Math.round(rec.secs / 60)} minutes. Well done.`);
+    toast(msg + (rec.done ? " ✓" : ""));
+  },
+};
+$("#rl-pause").addEventListener("click", () => Run.pause());
+$("#rl-skip").addEventListener("click", () => Run.skip());
+let endArmed = 0;
+$("#rl-end").addEventListener("click", () => {
+  if (Date.now() - endArmed < 3000) { endArmed = 0; $("#rl-end").textContent = "Finish"; Run.finish(false); return; }
+  endArmed = Date.now(); $("#rl-end").textContent = "Tap again"; setTimeout(() => { $("#rl-end").textContent = "Finish"; }, 3000);
+});
+$("#rn-start").addEventListener("click", () => {
+  const n = nextSession(data.planDone) || { week: 8, day: 3 };
+  if (!chCmd) toast("Watch not connected: cues will play on the phone only");
+  Run.start(sessionSegs(n.week), `Week ${n.week} · Day ${n.day}`, sessionId(n.week, n.day));
+});
+$("#rn-free").addEventListener("click", () => { if (!chCmd) toast("Watch not connected: no heart rate or watch cues"); Run.start(null, "Free run", null); });
+
+function renderRun() {
+  const n = nextSession(data.planDone);
+  if (n) {
+    const segs = sessionSegs(n.week), wk = PLAN_WEEKS[n.week - 1];
+    $("#rn-week").textContent = `Week ${n.week} of 8 · Day ${n.day} of 3`;
+    $("#rn-title").textContent = `${Math.round(totalSecs(segs) / 60)} min session`;
+    $("#rn-desc").textContent = `5 min warm-up walk · ${wk.note} · 5 min cool-down. ${Math.round(runSecs(segs) / 60)} min of running in total.`;
+    $("#rn-bar").innerHTML = segBarHtml(segs);
+  } else {
+    $("#rn-week").textContent = "Plan complete"; $("#rn-title").textContent = "You can run 30 minutes";
+    $("#rn-desc").textContent = "Keep going with free runs, or repeat week 8."; $("#rn-bar").innerHTML = segBarHtml(sessionSegs(8));
+  }
+  const pct = Math.round(data.planDone.length / 24 * 100);
+  $("#rp-pct").textContent = `${data.planDone.length} of 24 sessions`; $("#rp-bar").style.width = pct + "%";
+  $("#rp-weeks").innerHTML = PLAN_WEEKS.map(w => `<div class="wk"><b>Week ${w.w}</b><span class="dots">${[1, 2, 3].map(d =>
+    `<span class="${data.planDone.includes(sessionId(w.w, d)) ? "on" : ""}">●</span>`).join("")}</span></div>`).join("");
+  // this week (Monday start, local time)
+  const now = new Date(), mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7)).getTime();
+  const wkRuns = data.runs.filter(r => r.start >= mon);
+  $("#rw-runs").textContent = wkRuns.length;
+  $("#rw-min").textContent = Math.round(wkRuns.reduce((a, r) => a + r.secs, 0) / 60);
+  $("#rw-km").textContent = (wkRuns.reduce((a, r) => a + r.m, 0) / 1000).toFixed(1);
+  $("#run-list").innerHTML = data.runs.length ? data.runs.slice(0, 30).map(r => `<div class="item">
+      <div class="t"><span>${esc(r.name)}${r.done ? " ✓" : ""}</span><span>${fmtClock(r.secs)}</span></div>
+      <div class="s">${new Date(r.start).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
+      ${r.m ? ` · ${(r.m / 1000).toFixed(2)} km${r.src === "steps" ? " (est.)" : ""} · ${fmtPace(r.secs, r.m)}/km` : ""}
+      ${r.avgHr ? ` · HR ${r.avgHr} avg / ${r.maxHr} max` : ""}${r.steps ? ` · ${r.steps.toLocaleString()} steps` : ""}</div></div>`).join("")
+    : `<div class="empty">No runs yet. Your first session is about 25 minutes, mostly walking.</div>`;
+  $("#c-hrinfo").textContent = `Estimated max heart rate: ${maxHr()} bpm (220 minus your age from Settings → Profile).`;
+}
+
 // ---------- Start ----------
 if (!navigator.bluetooth) { $("#unsupported").hidden = false; $("#b-connect").disabled = true; }
 $("#b-connect").addEventListener("click", connect);
 $("#b-showall").addEventListener("click", e => { e.preventDefault(); connect(e, true); });
-renderAll(); renderAlarms(); renderNotes();
+renderAll(); renderAlarms(); renderNotes(); renderRun();
 </script>
 </body>
 </html>
