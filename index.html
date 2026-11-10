@@ -547,6 +547,11 @@ function command(cmd, parts = [], now = secsNow(), tz = tzNow()) {
   return wrap(pb);
 }
 const hm = (h, m) => (h << 16) | m;           // NumUtil.bytes2IntBig({0,h,0,m})
+// Weather day timestamp exactly as SetWeatherEvent.getCurrentTimeWithSecond computes it:
+// the forecast day's midnight (Unix seconds) minus timezone*3564 when the timezone field is in hours*100.
+function weatherSecs(dayMidnightUnix, tz = tzNow(), now = secsNow()) {
+  return (tz < -50 || tz > 50) ? dayMidnightUnix - tz * 3564 : now;
+}
 const signMag = t => (Math.abs(t) & 0x7f) | (t < 0 ? 0x80 : 0);
 const parseHM = s => s.split(":").map(Number);
 
@@ -598,8 +603,9 @@ const Frames = {
     return command(9, [[13, enc(items)]], now, tz);
   },
   // weather: [{code, now, lo, hi}] day 0 = today
+  // weather: [{code, now, lo, hi, secs}] day 0 = today. `secs` follows SetWeatherEvent (see weatherSecs).
   weather: (days, now = secsNow(), tz) => command(26, [[27, enc(days.map((d, i) => b(1, enc([
-    u(1, i), u(2, d.code), u(3, signMag(d.now)), u(4, 0), u(5, 0), u(6, 0), u(7, signMag(d.hi)), u(8, signMag(d.lo)), u(9, now)]))))]], now, tz),
+    u(1, i), u(2, d.code), u(3, signMag(d.now)), u(4, 0), u(5, 0), u(6, 0), u(7, signMag(d.hi)), u(8, signMag(d.lo)), u(9, d.secs ?? now)]))))]], now, tz),
   musicInfo: (playing, title, now, tz) => command(30, [[31, enc([u(1, playing ? 0 : 1), b(3, new TextEncoder().encode(title || ""))])]], now, tz),
   musicVolume: (vol10, now, tz) => command(30, [[31, enc([u(1, 5), u(2, vol10)])]], now, tz),
   liveHr: (now, tz) => command(35, [[36, enc([u(1, 10)])]], now, tz),
@@ -716,7 +722,7 @@ const SPORTS = { 1: "Running", 2: "Cycling", 3: "Rope skipping", 4: "Swimming", 
   16: "Hockey", 17: "Dancing", 18: "Spinning", 19: "Yoga", 20: "Sit-ups", 21: "Treadmill", 22: "Gym", 23: "Rowing", 24: "Jumping jacks",
   25: "Free training", 26: "Open-water swim", 27: "Pool swim" };
 
-if (typeof module !== "undefined") module.exports = { Frames, decodeReply, pbRead, crc16, ChunkJoiner, parseHealthBlob, localSecs, SPORTS };
+if (typeof module !== "undefined") module.exports = { Frames, decodeReply, pbRead, crc16, ChunkJoiner, parseHealthBlob, localSecs, SPORTS, weatherSecs };
 </script>
 
 <script id="runlogic">
@@ -1133,20 +1139,44 @@ $("#h-hrday").addEventListener("change", renderHistory);
 function renderAll() { renderToday(); renderHistory(); }
 
 // ---------- Find phone ring ----------
-let actx, ringTimer;
-function unlockAudio() { try { actx ||= new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch {} }
-function beep() {
-  if (!actx) return;
-  const o = actx.createOscillator(), g = actx.createGain();
-  o.type = "square"; o.frequency.value = 1320; g.gain.value = 0.15;
-  o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.25);
+// iPhones mute Web Audio when the ring/silent switch is on, and web pages can't vibrate there.
+// Plain <audio> playback is treated as media and still plays, so the sounds are small generated WAV files.
+function wavUrl(parts, rate = 16000) {
+  const n = Math.round(parts.reduce((a, p) => a + p[1], 0) * rate), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+  let k = 0;
+  for (const [f, secs] of parts) {
+    const m = Math.round(secs * rate);
+    for (let i = 0; i < m; i++, k++) {
+      const env = Math.min(1, i / 160, (m - i) / 160);               // short fade in/out, no clicks
+      v.setInt16(44 + k * 2, f ? Math.round(Math.sin(2 * Math.PI * f * i / rate) * 0.6 * env * 32767) : 0, true);
+    }
+  }
+  return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
 }
+const sndBeep = new Audio(wavUrl([[1320, 0.16], [0, 0.07], [1760, 0.16]]));
+const sndRing = new Audio(wavUrl([[1320, 0.25], [0, 0.1], [1320, 0.25], [0, 0.1], [1760, 0.3], [0, 0.5]]));
+sndRing.loop = true;
+let audioUnlocked = false, ringTimer;
+// iOS only lets a page play sound it first started during a tap, so prime both sounds silently on the first tap.
+function unlockAudio() {
+  if (audioUnlocked) return; audioUnlocked = true;
+  for (const el of [sndBeep, sndRing]) {
+    el.muted = true;
+    el.play().then(() => { if (!el.wanted) { el.pause(); el.currentTime = 0; } el.muted = false; }).catch(() => { el.muted = false; audioUnlocked = false; });
+  }
+}
+document.addEventListener("pointerdown", unlockAudio, { capture: true });
+function playEl(el) { el.wanted = true; el.muted = false; try { el.currentTime = 0; } catch {} el.play().catch(() => {}); }
+function beep() { playEl(sndBeep); }
+sndBeep.addEventListener("ended", () => { sndBeep.wanted = false; });
 function startRing() {
-  $("#ring-ov").classList.add("show"); clearInterval(ringTimer);
-  ringTimer = setInterval(() => { beep(); setTimeout(beep, 350); try { navigator.vibrate && navigator.vibrate(300); } catch {} }, 1000);
-  setTimeout(stopRing, 30000);
+  $("#ring-ov").classList.add("show"); playEl(sndRing);
+  clearTimeout(ringTimer); ringTimer = setTimeout(stopRing, 30000);
 }
-function stopRing() { clearInterval(ringTimer); $("#ring-ov").classList.remove("show"); }
+function stopRing() { sndRing.wanted = false; sndRing.pause(); clearTimeout(ringTimer); $("#ring-ov").classList.remove("show"); }
 $("#ring-stop").addEventListener("click", stopRing);
 $("#f-test").addEventListener("click", () => { unlockAudio(); startRing(); });
 
@@ -1249,6 +1279,16 @@ function renderAlarms() {
 $("#a-add").addEventListener("click", () => { if (alarms.length >= 8) return toast("The watch holds 8 alarms"); alarms.push({ on: true, h: 8, m: 0, days: [true, true, true, true, true, true, true] }); store.set("alarms", alarms); renderAlarms(); });
 
 // ---------- Weather ----------
+let wxForecast = null;   // [{hi, lo}] for the next 7 days, from "Fill from my location"
+// Like the official app: a 7-day list; day 0 uses the values on screen.
+function weatherDays() {
+  const code = val("wx-code"), today = new Date();
+  return Array.from({ length: 7 }, (_, i) => {
+    const mid = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i).getTime() / 1000;
+    const f = i === 0 || !wxForecast ? { hi: val("wx-hi"), lo: val("wx-lo") } : wxForecast[i];
+    return { code, now: i === 0 ? val("wx-now") : Math.round((f.hi + f.lo) / 2), lo: f.lo, hi: f.hi, secs: weatherSecs(mid) };
+  });
+}
 // The official app took icon codes from its (now offline) server, so the icon list is numbered, not named.
 $("#wx-code").innerHTML = Array.from({ length: 32 }, (_, i) => `<option value="${i}">Icon ${i}</option>`).join("");
 $("#wx-auto").addEventListener("click", () => {
@@ -1256,10 +1296,11 @@ $("#wx-auto").addEventListener("click", () => {
   navigator.geolocation.getCurrentPosition(async pos => {
     try {
       const q = `latitude=${pos.coords.latitude.toFixed(2)}&longitude=${pos.coords.longitude.toFixed(2)}`;
-      const j = await (await fetch(`https://api.open-meteo.com/v1/forecast?${q}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto`)).json();
+      const j = await (await fetch(`https://api.open-meteo.com/v1/forecast?${q}&current=temperature_2m&daily=temperature_2m_max,temperature_2m_min&forecast_days=7&timezone=auto`)).json();
       $("#wx-now").value = Math.round(j.current.temperature_2m); $("#wx-hi").value = Math.round(j.daily.temperature_2m_max[0]);
       $("#wx-lo").value = Math.round(j.daily.temperature_2m_min[0]);
-      toast("Temperatures filled in. Pick an icon, then tap Send weather.");
+      wxForecast = j.daily.temperature_2m_max.map((hi, i) => ({ hi: Math.round(hi), lo: Math.round(j.daily.temperature_2m_min[i]) }));
+      toast("7-day temperatures filled in. Pick an icon, then tap Send weather.");
     } catch (e) { toast("Couldn't get the forecast"); }
   }, () => toast("Location permission denied"));
 });
@@ -1278,7 +1319,13 @@ const val = id => +document.getElementById(id).value, chk = id => document.getEl
 
 // ---------- Actions ----------
 const ACTIONS = {
-  syncAll, find: () => send(Frames.findDevice()),
+  syncAll,
+  async find() {
+    const r = await send(Frames.findDevice(), { quiet: true });
+    // Backup: a message always makes the watch buzz (off the charger)
+    await send(Frames.notify("Find watch", "Your phone is looking for this watch"), { quiet: true });
+    toast(r ? "Sent. The watch buzzes only when it's off the charger." : "Find watch: no reply");
+  },
   async syncWorkouts() { const n = await syncWorkouts(); renderHistory(); toast(n ? `${n} workouts synced` : "No new workouts"); },
   async measureHr() {
     $("#t-hrk").textContent = "measuring… keep still";
@@ -1315,7 +1362,7 @@ const ACTIONS = {
     await send(Frames.dnd(sh, sm, eh, em), { quiet: true }); await send(Frames.dndSwitch(chk("d-on")));
   },
   saveAlarms: () => send(Frames.alarms(alarms)),
-  weather: () => send(Frames.weather([{ code: val("wx-code"), now: val("wx-now"), lo: val("wx-lo"), hi: val("wx-hi") }])),
+  weather: () => send(Frames.weather(weatherDays())),
 };
 $$("[data-act]").forEach(b => b.addEventListener("click", async () => {
   if (!chCmd) return toast("Connect the watch first");
