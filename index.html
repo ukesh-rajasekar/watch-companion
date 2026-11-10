@@ -275,6 +275,14 @@
     </div>
 
     <div class="card">
+      <h2>Phone type</h2>
+      <div class="switch"><span>This watch is used with</span>
+        <select id="s-phone" style="width:auto"><option value="0">iPhone</option><option value="1">Android</option></select></div>
+      <button class="full primary" style="margin-top:10px" data-act="savePhone">Apply</button>
+      <p class="hint">On iPhone, notifications and music control come straight from iOS, not from this app. After Apply, open the iPhone's Settings → Bluetooth, tap ⓘ next to the watch and turn on <b>Share System Notifications</b>.</p>
+    </div>
+
+    <div class="card">
       <h2>Display &amp; units</h2>
       <div class="switch"><span>Time format</span>
         <select id="s-timefmt" style="width:auto"><option value="1">24-hour</option><option value="2">12-hour</option></select></div>
@@ -450,8 +458,10 @@ const Frames = {
   findDevice: (now, tz) => command(25, [], now, tz),
   camera: (now, tz) => command(23, [], now, tz),
   bind: (now, tz) => command(1, [[4, enc([u(1, 123), u(2, 0), u(3, 23), u(4, 164), u(5, 65), u(6, 0)])]], now, tz),
-  defaults: (now, tz, goal = 8000) => command(50, [
-    [7, [0x08, 1, 0x10, 0, 0x18, 0, 0x20, 1]],
+  // phone type: 1 = Android (what the Android app sends); 0 = the other value the app's code uses, most likely iPhone
+  phoneInfo: (model, now, tz) => command(3, [[7, enc([u(1, model), u(2, 0), u(3, 0), u(4, 1)])]], now, tz),
+  defaults: (now, tz, goal = 8000, model = 1) => command(50, [
+    [7, [0x08, model, 0x10, 0, 0x18, 0, 0x20, 1]],
     [9, [0x0a, 5, 0x00, 0xff, 0xff, 0xff, 0xff]],
     [17, enc([u(1, 0), u(2, 0), u(3, goal)])],
     [18, [0x08, 1]], [19, [0x08, 1]], [20, [0x08, 5]],
@@ -1050,7 +1060,9 @@ $("#wx-auto").addEventListener("click", () => {
 });
 
 // ---------- Settings persistence ----------
-const SETTINGS_IDS = ["s-timefmt", "s-units", "s-bright", "s-raise", "p-sex", "p-age", "p-h", "p-w", "p-goal", "s-hrauto", "s-hrhi", "s-hrlo",
+// Default the phone type to the device this page is running on
+if (!/iPhone|iPad|iPod/.test(navigator.userAgent)) $("#s-phone").value = "1";
+const SETTINGS_IDS = ["s-phone", "s-timefmt", "s-units", "s-bright", "s-raise", "p-sex", "p-age", "p-h", "p-w", "p-goal", "s-hrauto", "s-hrhi", "s-hrlo",
   "r-sit", "r-sitmin", "r-sitfrom", "r-sitto", "r-noon", "d-on", "d-from", "d-to", "wx-now", "wx-lo", "wx-hi", "wx-code"];
 const savedS = store.get("settings", {});
 SETTINGS_IDS.forEach(id => { const e = document.getElementById(id); if (savedS[id] === undefined) return; e.type === "checkbox" ? (e.checked = savedS[id]) : (e.value = savedS[id]); });
@@ -1071,7 +1083,8 @@ const ACTIONS = {
     await send(Frames.liveHr(), { quiet: true });                    // read again once the fresh reading is done
   },
   bind: () => { toast("Accept the request on the watch"); return send(Frames.bind(), { timeout: 20000 }); },
-  async setup() { await send(Frames.defaults(undefined, undefined, store.get("profile", {}).goal || 8000)); await send(Frames.query(2), { quiet: true }); },
+  async setup() { await send(Frames.defaults(undefined, undefined, store.get("profile", {}).goal || 8000, val("s-phone"))); await send(Frames.query(2), { quiet: true }); },
+  savePhone: () => send(Frames.phoneInfo(val("s-phone"))),
   notify: () => send(Frames.notify(($("#n-title").value || "Note").trim(), ($("#n-body").value || " ").trim())),
   musicTitle: () => send(Frames.musicInfo(true, $("#m-custom").value)),
   async saveDisplay() {
