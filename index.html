@@ -131,6 +131,7 @@
     <button id="b-connect" class="primary small">Connect</button>
   </header>
 
+  <p class="hint" style="margin:-6px 0 12px;text-align:right">Watch not in the list? <a href="#" id="b-showall" style="color:var(--accent)">Show all devices</a></p>
   <div id="unsupported" class="note bad" hidden style="margin-bottom:12px">
     This browser can't use Bluetooth. On iPhone, open this page in the free <b>Bluefy</b> browser. On a computer, use Chrome or Edge.
   </div>
@@ -713,12 +714,14 @@ function handleFrame(r) {
   }
 }
 
-async function connect() {
+async function connect(e, showAll = false) {
   if (dev && dev.gatt.connected) { dev.gatt.disconnect(); return; }
   unlockAudio();
   try {
     setState("Choose…", "busy");
-    dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: "SOUNDPEATS" }, { services: [SVC] }], optionalServices: [SVC] });
+    dev = await navigator.bluetooth.requestDevice(showAll
+      ? { acceptAllDevices: true, optionalServices: [SVC] }
+      : { filters: [{ namePrefix: "SOUNDPEATS" }, { services: [SVC] }], optionalServices: [SVC] });
     dev.addEventListener("gattserverdisconnected", onDisconnect);
     await openGatt();
   } catch (err) {
@@ -1114,6 +1117,7 @@ applyTheme(store.get("theme", ""));
 // ---------- Start ----------
 if (!navigator.bluetooth) { $("#unsupported").hidden = false; $("#b-connect").disabled = true; }
 $("#b-connect").addEventListener("click", connect);
+$("#b-showall").addEventListener("click", e => { e.preventDefault(); connect(e, true); });
 renderAll(); renderAlarms(); renderNotes();
 </script>
 </body>
