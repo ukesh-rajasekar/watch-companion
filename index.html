@@ -1,0 +1,1120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1013">
+<title>Watch Companion</title>
+<style>
+  :root {
+    --bg: #f3f4f7; --card: #ffffff; --text: #15171c; --muted: #646b78; --line: #e1e4ea; --soft: #eef0f4;
+    --accent: #2f6bff; --accent-text: #ffffff; --ok: #158a48; --warn: #b26a00; --bad: #c62f2f;
+    --steps: #2f6bff; --heart: #e0455a; --sleep: #7b5cff; --sleep2: #b9a8ff; --awake: #f0a640;
+    --log-bg: #0f1115; --log-text: #c9d1d9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1013; --card: #171a1f; --text: #e8eaee; --muted: #9aa1ad; --line: #2a2f37; --soft: #20242b;
+      --accent: #5b8cff; --accent-text: #0b0d10; --ok: #4cc785; --warn: #f0a640; --bad: #ff6b6b;
+      --steps: #5b8cff; --heart: #ff6b81; --sleep: #9a83ff; --sleep2: #5a4aa8; --awake: #f0a640;
+      --log-bg: #07080a; --log-text: #b8c0cc;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1013; --card: #171a1f; --text: #e8eaee; --muted: #9aa1ad; --line: #2a2f37; --soft: #20242b;
+    --accent: #5b8cff; --accent-text: #0b0d10; --ok: #4cc785; --warn: #f0a640; --bad: #ff6b6b;
+    --steps: #5b8cff; --heart: #ff6b81; --sleep: #9a83ff; --sleep2: #5a4aa8; --awake: #f0a640;
+    --log-bg: #07080a; --log-text: #b8c0cc;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: max(12px, env(safe-area-inset-top)) 16px calc(84px + env(safe-area-inset-bottom));
+  }
+  main { max-width: 560px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; }
+  header h1 { font-size: 20px; margin: 0; flex: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted);
+          background: var(--card); border: 1px solid var(--line); border-radius: 99px; padding: 5px 10px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.on { background: var(--ok); } .dot.busy { background: var(--warn); }
+  section.tab { display: none; gap: 12px; }
+  section.tab.active { display: grid; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-width: 0; }
+  .card h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+             display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat { background: var(--soft); border-radius: 11px; padding: 10px; min-width: 0; }
+  .stat .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .k { font-size: 12px; color: var(--muted); }
+  .ring { display: grid; place-items: center; position: relative; width: 150px; height: 150px; margin: 4px auto 8px; }
+  .ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .ring .mid { text-align: center; }
+  .ring .mid b { font-size: 28px; display: block; font-variant-numeric: tabular-nums; }
+  .ring .mid span { font-size: 12px; color: var(--muted); }
+  button {
+    font: inherit; font-weight: 600; border: 1px solid var(--line); background: var(--card); color: var(--text);
+    border-radius: 11px; padding: 10px 12px; min-height: 44px; cursor: pointer;
+  }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button.small { min-height: 34px; padding: 6px 10px; font-size: 13px; }
+  button:disabled { opacity: .45; cursor: default; }
+  .full { width: 100%; }
+  label.f { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+  input, textarea, select {
+    width: 100%; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; min-height: 42px;
+  }
+  input[type=checkbox] { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
+  input[type=range] { padding: 0; accent-color: var(--accent); }
+  textarea { min-height: 70px; resize: vertical; }
+  .switch { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .switch:last-child { border-bottom: 0; }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
+  .days { display: flex; gap: 4px; flex-wrap: wrap; }
+  .days label { font-size: 12px; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 30px;
+                border: 1px solid var(--line); border-radius: 8px; cursor: pointer; user-select: none; }
+  .days input { display: none; }
+  .days input:checked + span { color: var(--accent); font-weight: 700; }
+  .days label:has(input:checked) { border-color: var(--accent); background: var(--soft); }
+  .alarm { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .alarm:last-child { border-bottom: 0; }
+  .alarm input[type=time] { max-width: 130px; }
+  .list { display: grid; gap: 8px; }
+  .item { background: var(--soft); border-radius: 11px; padding: 10px 12px; }
+  .item .t { font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+  .item .s { font-size: 13px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+  .chart { width: 100%; height: auto; display: block; }
+  .chart text { fill: var(--muted); font-size: 10px; }
+  .legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+  nav.tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr);
+    background: var(--card); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); z-index: 5;
+  }
+  nav.tabs button { border: 0; background: none; min-height: 50px; padding: 4px 2px; font-size: 11px; color: var(--muted);
+                    display: grid; justify-items: center; gap: 2px; font-weight: 600; }
+  nav.tabs button svg { width: 22px; height: 22px; }
+  nav.tabs button.active { color: var(--accent); }
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(80px + env(safe-area-inset-bottom));
+           background: var(--text); color: var(--bg); border-radius: 10px; padding: 9px 14px; font-size: 14px;
+           opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; max-width: calc(100% - 32px); text-align: center; }
+  .toast.show { opacity: .95; }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; place-items: center; z-index: 30; padding: 16px; }
+  .overlay.show { display: grid; }
+  .overlay .card { max-width: 360px; width: 100%; text-align: center; }
+  .note { font-size: 13.5px; padding: 10px 12px; border-radius: 10px; background: var(--soft); }
+  .note.bad { color: var(--bad); }
+  video, .shot { width: 100%; border-radius: 10px; background: #000; display: block; }
+  .shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+  .shots img { width: 100%; border-radius: 8px; display: block; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  pre { background: var(--log-bg); color: var(--log-text); border-radius: 10px; padding: 10px;
+        font: 11.5px/1.4 ui-monospace, Menlo, Consolas, monospace; max-height: 260px; overflow: auto;
+        white-space: pre-wrap; word-break: break-all; margin: 10px 0 0; }
+  .np { font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+  .muted { color: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; min-height: 34px; padding: 6px 12px; font-size: 13px; }
+  .seg button.on { background: var(--accent); color: var(--accent-text); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Watch Companion</h1>
+    <span class="pill"><span id="dot" class="dot"></span><span id="state">Offline</span></span>
+    <button id="b-connect" class="primary small">Connect</button>
+  </header>
+
+  <div id="unsupported" class="note bad" hidden style="margin-bottom:12px">
+    This browser can't use Bluetooth. On iPhone, open this page in the free <b>Bluefy</b> browser. On a computer, use Chrome or Edge.
+  </div>
+
+  <!-- TODAY -->
+  <section class="tab active" id="tab-today">
+    <div class="card">
+      <h2>Today <button class="small" data-act="syncAll">Sync watch</button></h2>
+      <div class="ring">
+        <svg viewBox="0 0 150 150"><circle cx="75" cy="75" r="64" fill="none" stroke="var(--soft)" stroke-width="12"/>
+          <circle id="ring-arc" cx="75" cy="75" r="64" fill="none" stroke="var(--steps)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 402"/></svg>
+        <div class="mid"><b id="t-steps">–</b><span id="t-goal">steps</span></div>
+      </div>
+      <div class="grid3">
+        <div class="stat"><div class="v" id="t-km">–</div><div class="k">km</div></div>
+        <div class="stat"><div class="v" id="t-kcal">–</div><div class="k">kcal</div></div>
+        <div class="stat"><div class="v" id="t-active">–</div><div class="k">active min</div></div>
+      </div>
+      <p class="hint" id="t-sync">Not synced yet.</p>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h2>Heart rate</h2>
+        <div class="stat"><div class="v" id="t-hr" style="color:var(--heart)">–</div><div class="k" id="t-hrk">bpm, latest</div></div>
+        <button class="full" style="margin-top:10px" data-act="measureHr">Measure now</button>
+      </div>
+      <div class="card">
+        <h2>Watch</h2>
+        <div class="stat"><div class="v" id="t-batt">–</div><div class="k">battery (reported)</div></div>
+        <button class="full" style="margin-top:10px" data-act="find">Find watch</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Last night</h2>
+      <div id="t-sleep" class="empty">Sync the watch to see sleep.</div>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="tab" id="tab-history">
+    <div class="card">
+      <h2>Steps, last 7 days</h2>
+      <div id="h-steps"></div>
+    </div>
+    <div class="card">
+      <h2>Heart rate <select id="h-hrday" style="width:auto;min-height:32px;padding:4px 8px;font-size:13px"></select></h2>
+      <div id="h-hr"></div>
+    </div>
+    <div class="card">
+      <h2>Sleep</h2>
+      <div id="h-sleep"></div>
+    </div>
+    <div class="card">
+      <h2>Workouts <button class="small" data-act="syncWorkouts">Sync</button></h2>
+      <div id="h-workouts" class="list"></div>
+      <p class="hint">Start a workout (Running, Cycling…) on the watch itself. When it ends, sync here to see it.</p>
+    </div>
+  </section>
+
+  <!-- MUSIC -->
+  <section class="tab" id="tab-music">
+    <div class="card">
+      <h2>Player</h2>
+      <div class="np" id="m-title">Nothing loaded</div>
+      <div class="muted" id="m-sub" style="font-size:13px">Pick songs from this device. The watch's music screen controls this player.</div>
+      <audio id="m-audio" preload="metadata"></audio>
+      <input type="range" id="m-seek" min="0" max="1000" value="0" style="margin-top:12px">
+      <div class="row" style="justify-content:center;margin-top:8px">
+        <button id="m-prev" aria-label="Previous">⏮</button>
+        <button id="m-play" class="primary" style="min-width:90px">Play</button>
+        <button id="m-next" aria-label="Next">⏭</button>
+      </div>
+      <label class="f" for="m-vol">Volume</label>
+      <input type="range" id="m-vol" min="0" max="10" value="7">
+      <label class="f" for="m-files">Add songs</label>
+      <input type="file" id="m-files" accept="audio/*" multiple>
+      <div id="m-list" class="list" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h2>Send a title only</h2>
+      <div class="row">
+        <input id="m-custom" placeholder="Track name to show on the watch" style="flex:1;min-width:0">
+        <button data-act="musicTitle">Send</button>
+      </div>
+      <p class="hint">Shows a title on the watch's music screen without playing anything here.</p>
+    </div>
+  </section>
+
+  <!-- MESSAGES & TOOLS -->
+  <section class="tab" id="tab-tools">
+    <div class="card">
+      <h2>Send a message</h2>
+      <label class="f" for="n-title">Title</label>
+      <input id="n-title" maxlength="32" value="Note">
+      <label class="f" for="n-body">Message</label>
+      <textarea id="n-body" maxlength="200">Remember to stretch</textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" style="flex:1" data-act="notify">Send to watch</button>
+      </div>
+      <div class="row" style="margin-top:8px" id="n-quick"></div>
+      <p class="hint">Use this for notes and reminders. It shows only while the watch is off the charger.</p>
+    </div>
+    <div class="card">
+      <h2>Saved notes</h2>
+      <div id="n-saved" class="list"></div>
+      <button class="full small" style="margin-top:8px" id="n-save">Save current message as a note</button>
+    </div>
+    <div class="card">
+      <h2>Camera remote</h2>
+      <video id="c-video" playsinline muted hidden></video>
+      <div class="row" style="margin-top:8px">
+        <button id="c-open" style="flex:1">Open camera</button>
+        <button id="c-shoot" style="flex:1" disabled>Take photo</button>
+      </div>
+      <div class="shots" id="c-shots"></div>
+      <p class="hint">Once the camera is open, the watch's shutter button (if your watch sends one) takes a photo here.</p>
+    </div>
+    <div class="card">
+      <h2>Find</h2>
+      <div class="grid2">
+        <button data-act="find">Find watch</button>
+        <button id="f-test">Test phone ring</button>
+      </div>
+      <p class="hint">If you use "Find phone" on the watch, this page rings while it is open.</p>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="tab" id="tab-settings">
+    <div class="card">
+      <h2>Watch</h2>
+      <div class="grid2">
+        <button data-act="bind">Pair</button>
+        <button data-act="setup">Set up &amp; sync time</button>
+      </div>
+      <dl class="row" style="margin:12px 0 0;font-size:13px;gap:6px 14px">
+        <span class="muted">Name</span><span id="w-name">–</span>
+        <span class="muted">Firmware</span><span id="w-fw">–</span>
+      </dl>
+      <p class="hint">Pair once and accept on the watch. "Set up" sends the official app's default settings and sets the clock.</p>
+    </div>
+
+    <div class="card">
+      <h2>Display &amp; units</h2>
+      <div class="switch"><span>Time format</span>
+        <select id="s-timefmt" style="width:auto"><option value="1">24-hour</option><option value="2">12-hour</option></select></div>
+      <div class="switch"><span>Units</span>
+        <select id="s-units" style="width:auto"><option value="1">Metric</option><option value="2">Imperial</option></select></div>
+      <div class="switch"><span>Screen-on time</span>
+        <select id="s-bright" style="width:auto"><option>5</option><option>10</option><option>15</option><option>20</option></select></div>
+      <div class="switch"><span>Raise wrist to wake</span><input type="checkbox" id="s-raise" checked></div>
+      <button class="full primary" style="margin-top:10px" data-act="saveDisplay">Apply</button>
+    </div>
+
+    <div class="card">
+      <h2>Profile &amp; goal</h2>
+      <div class="grid2">
+        <div><label class="f" for="p-sex">Sex</label><select id="p-sex"><option value="1">Male</option><option value="0">Female</option></select></div>
+        <div><label class="f" for="p-age">Age</label><input id="p-age" type="number" min="5" max="100" value="23"></div>
+        <div><label class="f" for="p-h">Height (cm)</label><input id="p-h" type="number" min="80" max="230" value="164"></div>
+        <div><label class="f" for="p-w">Weight (kg)</label><input id="p-w" type="number" min="20" max="250" value="65"></div>
+      </div>
+      <label class="f" for="p-goal">Daily step goal</label>
+      <input id="p-goal" type="number" min="1000" max="50000" step="500" value="8000">
+      <button class="full primary" style="margin-top:10px" data-act="saveProfile">Apply</button>
+    </div>
+
+    <div class="card">
+      <h2>Health monitoring</h2>
+      <div class="switch"><span>Automatic heart-rate checks</span><input type="checkbox" id="s-hrauto" checked></div>
+      <div class="switch"><span>High heart-rate alert</span>
+        <select id="s-hrhi" style="width:auto"><option value="0">Off</option><option>100</option><option>110</option><option>120</option><option>130</option><option>140</option><option>150</option></select></div>
+      <div class="switch"><span>Low heart-rate alert</span>
+        <select id="s-hrlo" style="width:auto"><option value="0">Off</option><option>40</option><option>45</option><option>50</option></select></div>
+      <button class="full primary" style="margin-top:10px" data-act="saveHealth">Apply</button>
+    </div>
+
+    <div class="card">
+      <h2>Reminders</h2>
+      <div class="switch"><span>Move reminder (sitting too long)</span><input type="checkbox" id="r-sit"></div>
+      <div class="grid3">
+        <div><label class="f" for="r-sitmin">Every (min)</label><select id="r-sitmin"><option>30</option><option>45</option><option selected>60</option><option>90</option><option>120</option></select></div>
+        <div><label class="f" for="r-sitfrom">From</label><input id="r-sitfrom" type="time" value="09:00"></div>
+        <div><label class="f" for="r-sitto">To</label><input id="r-sitto" type="time" value="21:00"></div>
+      </div>
+      <div class="switch"><span>Quiet over lunch (12:00–14:00)</span><input type="checkbox" id="r-noon" checked></div>
+      <div class="switch"><span>Drink-water reminders (09:00–21:00)</span><button class="small" data-act="drink">Send</button></div>
+      <button class="full primary" style="margin-top:10px" data-act="saveSit">Apply move reminder</button>
+    </div>
+
+    <div class="card">
+      <h2>Do not disturb</h2>
+      <div class="switch"><span>Scheduled quiet hours</span><input type="checkbox" id="d-on"></div>
+      <div class="grid2">
+        <div><label class="f" for="d-from">From</label><input id="d-from" type="time" value="22:00"></div>
+        <div><label class="f" for="d-to">To</label><input id="d-to" type="time" value="08:00"></div>
+      </div>
+      <button class="full primary" style="margin-top:10px" data-act="saveDnd">Apply</button>
+    </div>
+
+    <div class="card">
+      <h2>Alarms <button class="small" id="a-add">Add</button></h2>
+      <div id="a-list"></div>
+      <button class="full primary" style="margin-top:10px" data-act="saveAlarms">Send alarms to watch</button>
+      <p class="hint">Up to 8 alarms. The watch vibrates at the set time.</p>
+    </div>
+
+    <div class="card">
+      <h2>Weather</h2>
+      <div class="grid3">
+        <div><label class="f" for="wx-now">Now °C</label><input id="wx-now" type="number" value="22"></div>
+        <div><label class="f" for="wx-lo">Low °C</label><input id="wx-lo" type="number" value="16"></div>
+        <div><label class="f" for="wx-hi">High °C</label><input id="wx-hi" type="number" value="26"></div>
+      </div>
+      <label class="f" for="wx-code">Icon</label>
+      <select id="wx-code"></select>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" style="flex:1" data-act="weather">Send weather</button>
+        <button id="wx-auto" style="flex:1">Fill from my location</button>
+      </div>
+      <p class="hint">"Fill from my location" asks for your location and gets today's temperatures from open-meteo.com. The watch's icon numbers aren't documented, so try a few to find the one you want.</p>
+    </div>
+
+    <div class="card">
+      <h2>Appearance</h2>
+      <div class="seg" id="theme-seg"><button data-th="">Auto</button><button data-th="light">Light</button><button data-th="dark">Dark</button></div>
+    </div>
+
+    <details class="card">
+      <summary>Bluetooth log</summary>
+      <pre id="log"></pre>
+    </details>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Sections">
+  <button data-tab="today" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Today</button>
+  <button data-tab="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>History</button>
+  <button data-tab="music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Music</button>
+  <button data-tab="tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Messages</button>
+  <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+<div class="overlay" id="ring-ov">
+  <div class="card">
+    <h2 style="justify-content:center">Find phone</h2>
+    <p style="font-size:18px;margin:6px 0 14px">Your watch is looking for this phone.</p>
+    <button class="primary full" id="ring-stop">Found it</button>
+  </div>
+</div>
+
+<script id="proto">
+// =====================================================================================
+// Watch protocol: SOUNDPEATS Watch 2 (Haylou "hl_cmds" protobuf over BLE).
+// Field numbers and encodings come from the official app's code (protocol/PbApi.java and
+// the haylou/event/*.java classes). Frames are checked against ones the watch accepted.
+// =====================================================================================
+const SVC = "000001ff-3c17-d293-8e48-14fe2e4da212";
+const CH = { cmd: "000002ff-3c17-d293-8e48-14fe2e4da212", ack: "000003ff-3c17-d293-8e48-14fe2e4da212",
+             myAck: "000004ff-3c17-d293-8e48-14fe2e4da212", data: "000005ff-3c17-d293-8e48-14fe2e4da212" };
+
+function varint(out, v) {
+  let x = BigInt.asUintN(64, BigInt(v));
+  while (x >= 0x80n) { out.push(Number(x & 0x7fn) | 0x80); x >>= 7n; }
+  out.push(Number(x));
+}
+function field(out, tag, v) { varint(out, tag); varint(out, v); }
+function bytes(out, tag, b) { varint(out, tag); varint(out, b.length); for (const x of b) out.push(x); }
+function u(no, v) { return { no, v }; }          // varint field inside a sub-message
+function b(no, v) { return { no, b: v }; }       // bytes / nested message field
+function enc(fields) {                            // encode a sub-message
+  const o = [];
+  for (const f of fields) {
+    if (f.b !== undefined) bytes(o, (f.no << 3) | 2, f.b instanceof Uint8Array || Array.isArray(f.b) ? f.b : enc(f.b));
+    else field(o, f.no << 3, f.v);
+  }
+  return o;
+}
+function crc16(d) {
+  let c = 0;
+  for (const x of d) for (let i = 0; i < 8; i++) {
+    const bit = (x >> (7 - i)) & 1, top = (c >> 15) & 1;
+    c = (c << 1) & 0xffff;
+    if (bit ^ top) c ^= 0x1021;
+  }
+  return c;
+}
+function wrap(body) {
+  const f = [0x7e, 0x6d, 3, body.length & 0xff, body.length >> 8];
+  const c = crc16(body); f.push(c & 0xff, c >> 8);
+  let s = 0; for (let i = 0; i < 7; i++) s += f[i];
+  f.push(s & 0xff, (s >> 8) & 0xff);
+  return Uint8Array.from([...f, ...body]);
+}
+const tzMinutes = () => -new Date().getTimezoneOffset();
+function tzNow() { return Math.round(tzMinutes() / 60 * 100); }
+function secsNow() { return Math.floor(Date.now() / 1000); }
+// The watch keeps history in "local seconds": Unix seconds shifted by the time-zone offset.
+function localSecs(ms = Date.now()) { return Math.floor(ms / 1000) + tzMinutes() * 60; }
+
+// Every command: 1 cmd, 2 response=false, 3 UTC seconds, payload fields, 45 timezone (hours*100)
+function command(cmd, parts = [], now = secsNow(), tz = tzNow()) {
+  const pb = [];
+  field(pb, 0x08, cmd); field(pb, 0x10, 0); field(pb, 0x18, now);
+  for (const [no, body] of parts) bytes(pb, (no << 3) | 2, body);
+  field(pb, 45 << 3, tz);
+  return wrap(pb);
+}
+const hm = (h, m) => (h << 16) | m;           // NumUtil.bytes2IntBig({0,h,0,m})
+const signMag = t => (Math.abs(t) & 0x7f) | (t < 0 ? 0x80 : 0);
+const parseHM = s => s.split(":").map(Number);
+
+const Frames = {
+  query: (cmd, now, tz) => command(cmd, [], now, tz),   // 2 device info, 21 power, 40 steps, 41 sport state, 49 latest HR
+  findDevice: (now, tz) => command(25, [], now, tz),
+  camera: (now, tz) => command(23, [], now, tz),
+  bind: (now, tz) => command(1, [[4, enc([u(1, 123), u(2, 0), u(3, 23), u(4, 164), u(5, 65), u(6, 0)])]], now, tz),
+  defaults: (now, tz, goal = 8000) => command(50, [
+    [7, [0x08, 1, 0x10, 0, 0x18, 0, 0x20, 1]],
+    [9, [0x0a, 5, 0x00, 0xff, 0xff, 0xff, 0xff]],
+    [17, enc([u(1, 0), u(2, 0), u(3, goal)])],
+    [18, [0x08, 1]], [19, [0x08, 1]], [20, [0x08, 5]],
+    [21, [0x08, 0, 0x10, 0]], [31, [0x08, 1]], [36, [0x08, 10]],
+  ], now, tz),
+  notify: (title, text, now = secsNow(), tz) => {
+    const e = new TextEncoder(), t = e.encode(title), m = e.encode(text);
+    return command(19, [[23, enc([u(1, 3), u(2, t.length), u(3, m.length), b(4, []), b(5, t), b(6, m), u(7, now)])]], now, tz);
+  },
+  // Settings (each mirrors one haylou/event/*Event.java)
+  timeFormat: (v, now, tz) => command(14, [[18, enc([u(1, v)])]], now, tz),          // 1 = 24h, 2 = 12h
+  metric: (v, now, tz) => command(15, [[19, enc([u(1, v)])]], now, tz),              // 1 = metric, 2 = imperial
+  brightTime: (s, now, tz) => command(16, [[20, enc([u(1, s)])]], now, tz),
+  hrWarning: (hi, lo, now, tz) => command(17, [[21, enc([u(1, hi), u(2, lo)])]], now, tz),
+  hrSlot: (now, tz) => command(6, [[10, enc([u(1, 2)])]], now, tz),
+  sportTarget: (steps, now, tz) => command(13, [[17, enc([u(1, 0), u(2, 0), u(3, steps)])]], now, tz),
+  userInfo: (p, now, tz) => command(4, [[8, enc([u(1, 36350304), u(2, p.sex), u(3, p.age), u(4, p.height), u(5, p.weight), u(6, 0)])]], now, tz),
+  // Switch groups (SyncSwitchEvent): 0 app alerts, 1 do-not-disturb, 2 move reminder, 4 raise-to-wake, 5 auto HR
+  switches: (arr, now, tz) => command(5, [[9, enc([b(1, arr)])]], now, tz),
+  raiseToWake: (on, now, tz) => Frames.switches([4, ((on ? 1 : 0) << 1) | 1], now, tz),
+  autoHr: (on, now, tz) => Frames.switches([5, (on ? 1 : 0) | 2], now, tz),
+  dndSwitch: (on, now, tz) => Frames.switches([1, on ? 1 : 0], now, tz),
+  sitSwitch: (on, noon, now, tz) => Frames.switches([2, (on ? 1 : 0) | ((noon ? 1 : 0) << 1)], now, tz),
+  dnd: (sh, sm, eh, em, now, tz) => command(10, [[14, enc([b(1, [sh, sm, eh, em]), b(2, [0, 0, 0, 0])])]], now, tz),
+  longSit: (mins, sh, sm, eh, em, now, tz) =>
+    command(7, [[11, enc([u(1, mins), u(2, hm(sh, sm)), u(3, hm(eh, em)), u(4, hm(12, 0)), u(5, hm(14, 0))])]], now, tz),
+  drink: (now, tz) => command(8, [[12, enc([u(1, 1), u(2, 589824), u(3, 1376256), u(4, 786432), u(5, 917504)])]], now, tz),
+  // alarms: [{on, days:[Sun..Sat booleans], h, m}] padded to 8, cfg byte = enable | day<<(i+1)
+  alarms: (list, now, tz) => {
+    const items = [];
+    for (let i = 0; i < 8; i++) {
+      const a = list[i];
+      let cfg = 0, h = 0, m = 0;
+      if (a) { cfg = a.on ? 1 : 0; a.days.forEach((d, k) => { if (d) cfg |= 1 << (k + 1); }); h = a.h; m = a.m; }
+      items.push(b(1, enc([b(1, [cfg & 0xff]), u(2, h), u(3, m)])));
+    }
+    return command(9, [[13, enc(items)]], now, tz);
+  },
+  // weather: [{code, now, lo, hi}] day 0 = today
+  weather: (days, now = secsNow(), tz) => command(26, [[27, enc(days.map((d, i) => b(1, enc([
+    u(1, i), u(2, d.code), u(3, signMag(d.now)), u(4, 0), u(5, 0), u(6, 0), u(7, signMag(d.hi)), u(8, signMag(d.lo)), u(9, now)]))))]], now, tz),
+  musicInfo: (playing, title, now, tz) => command(30, [[31, enc([u(1, playing ? 0 : 1), b(3, new TextEncoder().encode(title || ""))])]], now, tz),
+  musicVolume: (vol10, now, tz) => command(30, [[31, enc([u(1, 5), u(2, vol10)])]], now, tz),
+  liveHr: (now, tz) => command(35, [[36, enc([u(1, 10)])]], now, tz),
+  // history: type 0 steps, 1 sleep, 2 heart rate, 4 SpO2, 5 active minutes; times in local seconds
+  healthSync: (type, start, end, now, tz) => command(20, [[24, enc([u(1, (type | 0x80000000) >>> 0), u(2, start), u(3, end)])]], now, tz),
+  workoutSync: (start, end, now, tz) => command(46, [[44, enc([u(1, start), u(2, end)])]], now, tz),
+};
+
+// ---------- decoding ----------
+function pbRead(buf) {
+  const out = {}; let i = 0;
+  const rv = () => { let r = 0n, s = 0n; for (;;) { const x = buf[i++]; if (x === undefined) throw new Error("truncated"); r |= BigInt(x & 0x7f) << s; s += 7n; if (!(x & 0x80)) return r; } };
+  while (i < buf.length) {
+    const key = Number(rv()), no = key >> 3, wt = key & 7; let v;
+    if (wt === 0) v = Number(BigInt.asUintN(32, rv()));
+    else if (wt === 2) { const n = Number(rv()); v = buf.slice(i, i + n); i += n; }
+    else if (wt === 5) { v = new DataView(buf.buffer, buf.byteOffset + i, 4).getFloat32(0, true); i += 4; }
+    else if (wt === 1) { v = buf.slice(i, i + 8); i += 8; }
+    else break;
+    (out[no] ||= []).push(v);
+  }
+  return out;
+}
+const first = (m, no, d) => (m[no] ? m[no][0] : d);
+const sub = (m, no) => (m[no] ? pbRead(m[no][0]) : null);
+const CMD_NAMES = { 1: "Pairing", 2: "Device info", 4: "Profile", 5: "Switches", 6: "Heart-rate interval", 7: "Move reminder",
+  8: "Drink reminder", 9: "Alarms", 10: "Do not disturb", 13: "Step goal", 14: "Time format", 15: "Units", 16: "Screen time",
+  17: "Heart-rate alerts", 19: "Message", 20: "History", 21: "Battery", 23: "Camera", 24: "Find phone", 25: "Find watch",
+  26: "Weather", 30: "Music", 35: "Heart rate", 40: "Steps", 46: "Workouts", 49: "Heart rate", 50: "Setup" };
+
+function decodeReply(frame) {
+  const top = pbRead(frame.slice(9));
+  const r = { cmd: first(top, 1), response: !!first(top, 2, 0), seconds: first(top, 3), raw: top };
+  const dec = new TextDecoder();
+  const e = sub(top, 48); if (e) r.error = first(e, 1, 0);
+  const di = sub(top, 6); if (di) r.info = { name: di[1] && dec.decode(di[1][0]), fw: di[3] && dec.decode(di[3][0]), battery: first(di, 9) };
+  const p = sub(top, 25); if (p) r.power = first(p, 2);
+  const ui = sub(top, 47); if (ui) r.hrs = { now: first(ui, 1, 0), max: first(ui, 2, 0), min: first(ui, 3, 0) };
+  const hv = sub(top, 37); if (hv) r.hrValue = first(hv, 1, 0);
+  const hv2 = sub(top, 22); if (hv2) r.hrValue = first(hv2, 1, 0);
+  const st = sub(top, 40); if (st) r.steps = { steps: first(st, 1, 0), time: first(st, 2, 0), cal: first(st, 3, 0), dist: first(st, 4, 0), active: first(st, 5, 0) };
+  const fp = sub(top, 35); if (fp) r.findPhone = first(fp, 1, 0);
+  const mu = sub(top, 31); if (mu) r.music = { code: first(mu, 1, 0), volume: first(mu, 2) };
+  const hd = sub(top, 30); if (hd) r.health = { err: first(hd, 1, 0), sn: first(hd, 2, 0), data: first(hd, 3, new Uint8Array()) };
+  const ar = sub(top, 43); if (ar) r.workout = {
+    count: first(ar, 1, 0), start: first(ar, 3, 0), hrCount: first(ar, 4, 0), type: first(ar, 5, 0), steps: first(ar, 6, 0),
+    duration: first(ar, 7, 0), kcal: first(ar, 8, 0), distance: first(ar, 9, 0), avgHr: first(ar, 10, 0), maxHr: first(ar, 11, 0),
+    sn: first(ar, 17, 0), hrData: first(ar, 18, new Uint8Array()), speed: first(ar, 19, 0), minHr: first(ar, 21, 0),
+    gpsCount: first(ar, 23, 0), totalGps: first(ar, 24, 0) };
+  const dnd = sub(top, 39); if (dnd) r.dnd = first(dnd, 1, 0);
+  return r;
+}
+
+// Joins the chunks of one history blob (sn 0 .. n, last chunk sn 65535) — GetHealthDataEvent
+class ChunkJoiner {
+  constructor() { this.buf = null; this.idx = 0; this.lastSn = 0; }
+  push(sn, data) {
+    if (sn === 0 || (sn === 65535 && !this.buf)) {
+      const total = (data[5] | (data[6] << 8)) + 10;
+      this.buf = new Uint8Array(Math.max(total, data.length)); this.buf.set(data, 0); this.idx = data.length; this.lastSn = 0;
+    } else if (this.buf && (sn === 65535 || sn - this.lastSn === 1)) {
+      this.buf.set(data.slice(0, this.buf.length - this.idx), this.idx); this.idx += data.length; this.lastSn = sn;
+    } else { this.buf = null; return { error: "chunk out of order" }; }
+    if (sn === 65535) { const out = this.buf; this.buf = null; return { blob: out }; }
+    return null;
+  }
+}
+const u16 = (a, i) => a[i] | (a[i + 1] << 8);
+const u32 = (a, i) => (a[i] | (a[i + 1] << 8) | (a[i + 2] << 16) | (a[i + 3] << 24)) >>> 0;
+const dayKey = s => new Date(s * 1000).toISOString().slice(0, 10);   // local seconds -> local date
+
+function parseHealthBlob(blob) {
+  const type = blob[0], date = u32(blob, 1), len = u16(blob, 5), count = u16(blob, 7), unit = blob[9];
+  const d = blob.slice(10, 10 + len);
+  const out = { type, date, day: dayKey(date), count, unit };
+  if (type === 0 && unit && d.length === unit * 144) {            // steps: 144 x 10-min slots: steps, cal, distance (u16)
+    const hourly = new Array(24).fill(0); let steps = 0, cal = 0, dist = 0;
+    for (let k = 0; k < 144; k++) {
+      const o = k * unit; let s = u16(d, o), c = u16(d, o + 2), m = u16(d, o + 4);
+      if (s === 65535) s = 0; if (c === 65535) c = 0; if (m === 65535) m = 0;
+      hourly[Math.floor(k / 6)] += s; steps += s; cal += c; dist += m;
+    }
+    Object.assign(out, { steps, kcal: cal / 1000, km: dist / 100000, hourly });
+  } else if (type === 2 && unit && d.length === unit * 144) {     // heart rate: 144 x 10-min slots
+    const hr = []; let sum = 0, n = 0, min = 255, max = 0;
+    for (let k = 0; k < 144; k++) {
+      const v = d[k * unit], ok = v >= 30 && v <= 230;
+      hr.push(ok ? v : 0);
+      if (ok) { sum += v; n++; min = Math.min(min, v); max = Math.max(max, v); }
+    }
+    Object.assign(out, { hr, hrAvg: n ? Math.round(sum / n) : 0, hrMin: n ? min : 0, hrMax: max });
+  } else if (type === 1 && unit && d.length === unit * 1440) {    // sleep: 1440 x 1-min, day starts 18:00 the evening before
+    let a = -1, z = -1;
+    for (let k = 0; k < d.length; k += unit) if ((d[k] & 0x0f) === 2) { if (a < 0) a = k; z = k; }
+    const s = { deep: 0, light: 0, awake: 0, wakes: 0 };
+    if (a >= 0 && z > a) {
+      let lastAwake = -999;
+      for (let k = a; k < z; k += unit) {
+        const v = d[k];
+        if ((v & 0x0f) === 1) { if (k - lastAwake > unit) s.wakes++; lastAwake = k; }
+        if (v === 0x31 || v === 0x41) s.awake++; else if (v === 0x32) s.light++; else if (v === 0x42) s.deep++;
+      }
+      s.start = date + (a / unit - 360) * 60; s.end = date + (z / unit - 360) * 60;
+    }
+    if (s.deep + s.light >= 60) out.sleep = s;
+  } else if (type === 5 && unit) {                                  // active seconds per 10-min slot
+    let sec = 0; for (let k = 0; k + 1 < d.length; k += unit) { const v = u16(d, k); if (v !== 65535) sec += v; }
+    out.activeMin = Math.round(sec / 60);
+  }
+  return out;
+}
+const SPORTS = { 1: "Running", 2: "Cycling", 3: "Rope skipping", 4: "Swimming", 5: "Badminton", 6: "Table tennis", 7: "Tennis",
+  8: "Climbing", 9: "Hiking", 10: "Basketball", 11: "Football", 12: "Baseball", 13: "Volleyball", 14: "Cricket", 15: "American football",
+  16: "Hockey", 17: "Dancing", 18: "Spinning", 19: "Yoga", 20: "Sit-ups", 21: "Treadmill", 22: "Gym", 23: "Rowing", 24: "Jumping jacks",
+  25: "Free training", 26: "Open-water swim", 27: "Pool swim" };
+
+if (typeof module !== "undefined") module.exports = { Frames, decodeReply, pbRead, crc16, ChunkJoiner, parseHealthBlob, localSecs, SPORTS };
+</script>
+
+<script>
+// =====================================================================================
+// App
+// =====================================================================================
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const hex = a => Array.from(a, x => x.toString(16).padStart(2, "0").toUpperCase()).join(" ");
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("wc." + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("wc." + k, JSON.stringify(v)); } catch {} },
+};
+const data = store.get("data", { days: {}, workouts: [] });
+const saveData = () => store.set("data", data);
+
+// ---------- UI helpers ----------
+let toastT;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2600); }
+function log(s) { const el = $("#log"); el.textContent = (new Date().toLocaleTimeString() + "  " + s + "\n" + el.textContent).slice(0, 30000); }
+function setState(text, kind) { $("#state").textContent = text; $("#dot").className = "dot " + (kind || ""); }
+const fmtTime = s => new Date(s * 1000).toISOString().slice(11, 16);                     // local seconds -> HH:MM
+const fmtDay = k => new Date(k + "T00:00:00Z").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+const fmtDur = m => (m >= 60 ? Math.floor(m / 60) + "h " : "") + (m % 60) + "m";
+const todayKey = () => new Date(localSecs() * 1000).toISOString().slice(0, 10);
+const day = k => (data.days[k] ||= {});
+
+$$("nav.tabs button").forEach(b => b.addEventListener("click", () => {
+  $$("nav.tabs button").forEach(x => x.classList.toggle("active", x === b));
+  $$("section.tab").forEach(s => s.classList.toggle("active", s.id === "tab-" + b.dataset.tab));
+  window.scrollTo(0, 0);
+}));
+
+// ---------- Bluetooth link ----------
+let dev = null, chCmd = null, chMyAck = null, rx = [], expect = 0;
+let waiters = [];          // {match(r), resolve, timer}
+let listeners = [];        // fn(r) for streaming replies (history sync)
+let queue = Promise.resolve();
+
+async function writeFrame(frame) {
+  for (let off = 0; off < frame.length; off += 20) {
+    const chunk = frame.slice(off, off + 20);
+    if (chCmd.writeValueWithoutResponse) await chCmd.writeValueWithoutResponse(chunk); else await chCmd.writeValue(chunk);
+    await sleep(60);
+  }
+  log("TX " + hex(frame));
+}
+// Send one command and wait for the watch's reply to it (or time out). Commands run one at a time.
+function send(frame, { timeout = 4000, quiet = false } = {}) {
+  const cmd = frame[10];
+  const job = queue.then(async () => {
+    if (!chCmd) throw new Error("Not connected");
+    const wait = new Promise(resolve => {
+      // Most commands get a reply flagged "response"; the step count (40) comes back as a plain update instead.
+      const w = { match: r => r.cmd === cmd && (r.response || !!r.steps), resolve };
+      w.timer = setTimeout(() => { waiters = waiters.filter(x => x !== w); resolve(null); }, timeout);
+      waiters.push(w);
+    });
+    await writeFrame(frame);
+    const r = await wait;
+    if (!quiet) {
+      const name = CMD_NAMES[cmd] || "Command " + cmd;
+      if (!r) toast(name + ": no reply"); else if (r.error) toast(name + ": watch error " + r.error); else toast(name + " ✓");
+    }
+    return r;
+  });
+  queue = job.catch(() => {});
+  return job;
+}
+
+function onData(e) {
+  const v = new Uint8Array(e.target.value.buffer);
+  if (v.length >= 9 && v[0] === 0x7e && v[1] === 0x6d) { rx = []; expect = 9 + (v[3] | (v[4] << 8)); }
+  rx.push(...v);
+  if (expect && rx.length >= expect) {
+    const frame = Uint8Array.from(rx.slice(0, expect)); expect = 0; rx = [];
+    chMyAck.writeValue(Uint8Array.from([0x66, 0x77, 0, 0, 0, 0, 0])).catch(err => log("ack failed: " + err));
+    log("RX " + hex(frame));
+    let r; try { r = decodeReply(frame); } catch (err) { log("decode error " + err); return; }
+    handleFrame(r);
+  }
+}
+
+function handleFrame(r) {
+  for (const w of waiters) if (w.match(r)) { clearTimeout(w.timer); waiters = waiters.filter(x => x !== w); w.resolve(r); break; }
+  listeners.forEach(fn => fn(r));
+  if (r.info) {
+    if (r.info.name) $("#w-name").textContent = r.info.name;
+    if (r.info.fw) $("#w-fw").textContent = r.info.fw;
+    if (r.info.battery != null) $("#t-batt").textContent = r.info.battery + "%";
+  }
+  if (r.power != null) $("#t-batt").textContent = r.power + "%";
+  if (r.steps) applySteps(r.steps);
+  if (r.hrs && r.hrs.now && r.hrs.now !== 255) showHr(r.hrs.now, `bpm · today ${r.hrs.min}–${r.hrs.max}`);
+  if (r.hrValue && r.hrValue !== 255) showHr(r.hrValue, "bpm, just measured");
+  // Things the watch starts by itself
+  if (!r.response) {
+    if (r.cmd === 24) r.findPhone === 0 ? startRing() : stopRing();
+    if (r.cmd === 30 && r.music) Player.fromWatch(r.music.code);
+    if (r.cmd === 23) Cam.shoot("watch");
+  }
+}
+
+async function connect() {
+  if (dev && dev.gatt.connected) { dev.gatt.disconnect(); return; }
+  unlockAudio();
+  try {
+    setState("Choose…", "busy");
+    dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: "SOUNDPEATS" }, { services: [SVC] }], optionalServices: [SVC] });
+    dev.addEventListener("gattserverdisconnected", onDisconnect);
+    await openGatt();
+  } catch (err) {
+    setState("Offline", ""); log("connect: " + err);
+    if (err.name !== "NotFoundError") toast("Couldn't connect: " + err.message);
+  }
+}
+async function openGatt() {
+  setState("Connecting…", "busy");
+  const gatt = await dev.gatt.connect();
+  const svc = await gatt.getPrimaryService(SVC);
+  chCmd = await svc.getCharacteristic(CH.cmd);
+  chMyAck = await svc.getCharacteristic(CH.myAck);
+  const chData = await svc.getCharacteristic(CH.data), chAck = await svc.getCharacteristic(CH.ack);
+  chData.addEventListener("characteristicvaluechanged", onData);
+  await chData.startNotifications();
+  await chAck.startNotifications();
+  setState(dev.name ? dev.name.replace("SOUNDPEATS ", "") : "Connected", "on");
+  $("#b-connect").textContent = "Disconnect"; $("#b-connect").classList.remove("primary");
+  await send(Frames.query(2), { quiet: true });
+  await send(Frames.query(40), { quiet: true });
+  await send(Frames.liveHr(), { quiet: true });   // replies at once with the latest, lowest and highest heart rate today
+}
+let reconnecting = false;
+async function onDisconnect() {
+  chCmd = null; setState("Offline", ""); $("#b-connect").textContent = "Connect"; $("#b-connect").classList.add("primary");
+  log("link lost");
+  if (reconnecting || !dev) return;
+  reconnecting = true;
+  for (let i = 0; i < 3 && dev && !dev.gatt.connected; i++) {
+    await sleep(2000 * (i + 1));
+    try { await openGatt(); toast("Reconnected"); } catch (e) { log("reconnect: " + e); }
+  }
+  reconnecting = false;
+}
+
+// ---------- Today ----------
+function applySteps(s) {
+  const k = todayKey(), d = day(k);
+  Object.assign(d, { steps: s.steps, kcal: s.cal / 1000, km: s.dist / 100000, activeMin: Math.round(s.active / 60) });
+  saveData(); renderToday();
+}
+function showHr(v, label) {
+  $("#t-hr").textContent = v; $("#t-hrk").textContent = label;
+  const d = day(todayKey()); d.lastHr = v; saveData();
+}
+function renderToday() {
+  const d = data.days[todayKey()] || {}, goal = store.get("profile", {}).goal || 8000;
+  $("#t-steps").textContent = d.steps != null ? d.steps.toLocaleString() : "–";
+  $("#t-goal").textContent = "of " + goal.toLocaleString() + " steps";
+  const frac = Math.min(1, (d.steps || 0) / goal);
+  $("#ring-arc").setAttribute("stroke-dasharray", (402 * frac).toFixed(1) + " 402");
+  $("#t-km").textContent = d.km != null ? d.km.toFixed(2) : "–";
+  $("#t-kcal").textContent = d.kcal != null ? Math.round(d.kcal) : "–";
+  $("#t-active").textContent = d.activeMin != null ? d.activeMin : "–";
+  if (d.lastHr && $("#t-hr").textContent === "–") $("#t-hr").textContent = d.lastHr;
+  $("#t-sync").textContent = data.lastSync ? "Last full sync " + new Date(data.lastSync).toLocaleString() : "Not synced yet.";
+  const last = Object.keys(data.days).sort().reverse().map(k => data.days[k].sleep).find(Boolean);
+  $("#t-sleep").innerHTML = last ? sleepHtml(last) : "Sync the watch to see sleep.";
+}
+function sleepHtml(s) {
+  const tot = s.deep + s.light;
+  return `<div class="grid3">
+    <div class="stat"><div class="v">${fmtDur(tot)}</div><div class="k">asleep ${fmtTime(s.start)}–${fmtTime(s.end)}</div></div>
+    <div class="stat"><div class="v" style="color:var(--sleep)">${fmtDur(s.deep)}</div><div class="k">deep</div></div>
+    <div class="stat"><div class="v">${fmtDur(s.light)}</div><div class="k">light · woke ${s.wakes}×</div></div></div>`;
+}
+
+// ---------- Sync history ----------
+async function syncHealth(type) {
+  const nowL = localSecs(), start = Math.floor(nowL / 86400) * 86400 - 7 * 86400, end = Math.floor(nowL / 3600) * 3600;
+  const joiner = new ChunkJoiner(); const blobs = []; let expectN = null, idle, fn;
+  const done = new Promise(resolve => {
+    const bump = () => { clearTimeout(idle); idle = setTimeout(resolve, 6000); };
+    fn = r => {
+      if (!r.health) return;
+      bump();
+      const res = joiner.push(r.health.sn, r.health.data);
+      if (res && res.blob) {
+        const p = parseHealthBlob(res.blob); blobs.push(p); expectN = p.count;
+        if (expectN && blobs.length >= expectN) resolve();
+      }
+    };
+    listeners.push(fn); bump();
+  });
+  const ack = await send(Frames.healthSync(type, start, end), { quiet: true, timeout: 8000 });
+  // error 10 = nothing recorded, 9 = nothing new, 3 = this watch doesn't keep that kind of history
+  if (!ack || ack.error) { clearTimeout(idle); listeners = listeners.filter(f => f !== fn); return []; }
+  await done; clearTimeout(idle); listeners = listeners.filter(f => f !== fn);
+  for (const p of blobs) {
+    const d = day(p.day);
+    if (p.type === 0 && p.steps != null) Object.assign(d, { steps: p.steps, kcal: p.kcal, km: p.km, hourly: p.hourly });
+    if (p.type === 2 && p.hr) Object.assign(d, { hr: p.hr, hrAvg: p.hrAvg, hrMin: p.hrMin, hrMax: p.hrMax });
+    if (p.type === 1 && p.sleep) d.sleep = p.sleep;
+    if (p.type === 5 && p.activeMin != null) d.activeMin = p.activeMin;
+  }
+  saveData();
+  return blobs;
+}
+async function syncWorkouts() {
+  const nowL = localSecs(), start = Math.floor(nowL / 86400) * 86400 - 30 * 86400, end = Math.floor(nowL / 3600) * 3600 + 3600;
+  const got = []; let cur = null, idle, need = null, fn;
+  const done = new Promise(resolve => {
+    const bump = () => { clearTimeout(idle); idle = setTimeout(resolve, 6000); };
+    fn = r => {
+      if (!r.workout) return;
+      bump();
+      const w = r.workout;
+      if (w.sn === 0 || !cur) cur = { ...w, hr: [] };
+      cur.hr.push(...w.hrData);
+      need = w.count + w.totalGps;
+      if (w.sn === 65535) { if (!w.gpsCount) got.push(cur); cur = null; if (need && got.length >= w.count) resolve(); }
+    };
+    listeners.push(fn); bump();
+  });
+  const ack = await send(Frames.workoutSync(start, end), { quiet: true, timeout: 8000 });
+  if (!ack || ack.error) { clearTimeout(idle); listeners = listeners.filter(f => f !== fn); return 0; }
+  await done; clearTimeout(idle); listeners = listeners.filter(f => f !== fn);
+  for (const w of got) {
+    if (data.workouts.some(x => x.start === w.start && x.type === w.type)) continue;
+    data.workouts.push({ start: w.start, type: w.type, duration: w.duration, steps: w.steps, km: w.distance / 1000,
+                         kcal: w.kcal, avgHr: w.avgHr, maxHr: w.maxHr, minHr: w.minHr, hr: w.hr.slice(0, w.hrCount) });
+  }
+  data.workouts.sort((a, b) => b.start - a.start); saveData();
+  return got.length;
+}
+async function syncAll() {
+  if (!chCmd) return toast("Connect the watch first");
+  toast("Syncing… keep the watch nearby");
+  try {
+    await send(Frames.query(40), { quiet: true });
+    const steps = await syncHealth(0), hr = await syncHealth(2), sl = await syncHealth(1);
+    await syncHealth(5);
+    const w = await syncWorkouts();
+    data.lastSync = Date.now(); saveData();
+    toast(`Synced: ${steps.length} days of steps, ${hr.length} of heart rate, ${sl.filter(x => x.sleep).length} nights, ${w} workouts`);
+  } catch (e) { log("sync: " + e); toast("Sync stopped: " + e.message); }
+  renderAll();
+}
+
+// ---------- History rendering ----------
+function bars(values, labels, color, h = 120) {
+  const max = Math.max(1, ...values), w = 300, bw = w / values.length;
+  return `<svg class="chart" viewBox="0 0 ${w} ${h + 18}" role="img">${values.map((v, i) => {
+    const bh = Math.round((v / max) * h), x = i * bw + bw * 0.18;
+    return `<rect x="${x.toFixed(1)}" y="${h - bh}" width="${(bw * 0.64).toFixed(1)}" height="${bh}" rx="3" fill="${color}"><title>${labels[i]}: ${v.toLocaleString()}</title></rect>
+            <text x="${(i * bw + bw / 2).toFixed(1)}" y="${h + 13}" text-anchor="middle">${labels[i]}</text>`;
+  }).join("")}</svg>`;
+}
+function renderHistory() {
+  const keys = [];
+  for (let i = 6; i >= 0; i--) keys.push(new Date((localSecs() - i * 86400) * 1000).toISOString().slice(0, 10));
+  const st = keys.map(k => (data.days[k] || {}).steps || 0);
+  $("#h-steps").innerHTML = st.some(Boolean)
+    ? bars(st, keys.map(k => new Date(k + "T00:00:00Z").toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" })), "var(--steps)") +
+      `<p class="hint">7-day average ${Math.round(st.reduce((a, b) => a + b, 0) / 7).toLocaleString()} steps</p>`
+    : `<div class="empty">No step history yet. Tap Sync watch on Today.</div>`;
+
+  const hrDays = Object.keys(data.days).filter(k => data.days[k].hr).sort().reverse();
+  const sel = $("#h-hrday"), prev = sel.value;
+  sel.innerHTML = hrDays.map(k => `<option value="${k}">${fmtDay(k)}</option>`).join("");
+  if (hrDays.includes(prev)) sel.value = prev;
+  const hd = data.days[sel.value];
+  if (hd && hd.hr) {
+    const pts = hd.hr.map((v, i) => [i, v]).filter(p => p[1]);
+    const W = 300, H = 110, lo = Math.max(30, hd.hrMin - 10), hi = hd.hrMax + 10;
+    const xy = p => [(p[0] / 143 * W).toFixed(1), (H - (p[1] - lo) / (hi - lo) * H).toFixed(1)];
+    $("#h-hr").innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H + 16}" role="img">
+      <polyline fill="none" stroke="var(--heart)" stroke-width="2" stroke-linejoin="round" points="${pts.map(p => xy(p).join(",")).join(" ")}"/>
+      ${[0, 6, 12, 18].map(hh => `<text x="${hh / 24 * W}" y="${H + 13}">${String(hh).padStart(2, "0")}:00</text>`).join("")}</svg>
+      <div class="grid3" style="margin-top:8px"><div class="stat"><div class="v">${hd.hrAvg}</div><div class="k">average</div></div>
+      <div class="stat"><div class="v">${hd.hrMin}</div><div class="k">lowest</div></div><div class="stat"><div class="v">${hd.hrMax}</div><div class="k">highest</div></div></div>`;
+  } else $("#h-hr").innerHTML = `<div class="empty">No heart-rate history yet.</div>`;
+
+  const nights = Object.keys(data.days).filter(k => data.days[k].sleep).sort().reverse().slice(0, 7);
+  $("#h-sleep").innerHTML = nights.length ? `<div class="list">${nights.map(k => {
+    const s = data.days[k].sleep, tot = s.deep + s.light + s.awake || 1;
+    return `<div class="item"><div class="t"><span>${fmtDay(k)}</span><span>${fmtDur(s.deep + s.light)}</span></div>
+      <svg class="chart" viewBox="0 0 300 10" style="margin:6px 0"><rect width="${300 * s.deep / tot}" height="10" rx="2" fill="var(--sleep)"/>
+      <rect x="${300 * s.deep / tot}" width="${300 * s.light / tot}" height="10" fill="var(--sleep2)"/>
+      <rect x="${300 * (s.deep + s.light) / tot}" width="${300 * s.awake / tot}" height="10" fill="var(--awake)"/></svg>
+      <div class="s">${fmtTime(s.start)}–${fmtTime(s.end)} · deep ${fmtDur(s.deep)} · light ${fmtDur(s.light)} · woke ${s.wakes}×</div></div>`;
+  }).join("")}</div><div class="legend" style="margin-top:8px"><span><i style="background:var(--sleep)"></i>Deep</span><span><i style="background:var(--sleep2)"></i>Light</span><span><i style="background:var(--awake)"></i>Awake</span></div>`
+    : `<div class="empty">No sleep recorded yet. Wear the watch overnight, then sync.</div>`;
+
+  $("#h-workouts").innerHTML = data.workouts.length ? data.workouts.slice(0, 30).map(w => `<div class="item">
+      <div class="t"><span>${SPORTS[w.type] || "Workout " + w.type}</span><span>${fmtDur(Math.round(w.duration / 60))}</span></div>
+      <div class="s">${fmtDay(new Date(w.start * 1000).toISOString().slice(0, 10))} ${fmtTime(w.start)}
+      ${w.km ? " · " + w.km.toFixed(2) + " km" : ""}${w.steps ? " · " + w.steps.toLocaleString() + " steps" : ""}${w.kcal ? " · " + w.kcal + " kcal" : ""}
+      ${w.avgHr ? " · HR " + w.avgHr + " avg / " + w.maxHr + " max" : ""}</div></div>`).join("")
+    : `<div class="empty">No workouts synced yet.</div>`;
+}
+$("#h-hrday").addEventListener("change", renderHistory);
+function renderAll() { renderToday(); renderHistory(); }
+
+// ---------- Find phone ring ----------
+let actx, ringTimer;
+function unlockAudio() { try { actx ||= new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch {} }
+function beep() {
+  if (!actx) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = "square"; o.frequency.value = 1320; g.gain.value = 0.15;
+  o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.25);
+}
+function startRing() {
+  $("#ring-ov").classList.add("show"); clearInterval(ringTimer);
+  ringTimer = setInterval(() => { beep(); setTimeout(beep, 350); try { navigator.vibrate && navigator.vibrate(300); } catch {} }, 1000);
+  setTimeout(stopRing, 30000);
+}
+function stopRing() { clearInterval(ringTimer); $("#ring-ov").classList.remove("show"); }
+$("#ring-stop").addEventListener("click", stopRing);
+$("#f-test").addEventListener("click", () => { unlockAudio(); startRing(); });
+
+// ---------- Music player (controlled from the watch) ----------
+const Player = {
+  tracks: [], i: 0, el: $("#m-audio"),
+  add(files) {
+    for (const f of files) this.tracks.push({ name: f.name.replace(/\.[^.]+$/, ""), url: URL.createObjectURL(f) });
+    this.renderList(); if (this.tracks.length === files.length) this.load(0);
+  },
+  load(i) {
+    if (!this.tracks.length) return;
+    this.i = (i + this.tracks.length) % this.tracks.length; const t = this.tracks[this.i];
+    this.el.src = t.url; $("#m-title").textContent = t.name; $("#m-sub").textContent = `Track ${this.i + 1} of ${this.tracks.length}`;
+    this.renderList();
+  },
+  async play() { if (!this.el.src) return toast("Add songs first"); unlockAudio(); try { await this.el.play(); } catch (e) { toast("Tap Play on this screen once to allow audio"); } },
+  pause() { this.el.pause(); },
+  toggle() { this.el.paused ? this.play() : this.pause(); },
+  next() { this.load(this.i + 1); this.play(); },
+  prev() { if (this.el.currentTime > 3) this.el.currentTime = 0; else { this.load(this.i - 1); this.play(); } },
+  setVol(v10) { v10 = Math.max(0, Math.min(10, v10)); this.el.volume = v10 / 10; $("#m-vol").value = v10; if (chCmd) send(Frames.musicVolume(v10), { quiet: true }); },
+  fromWatch(code) {          // MusicControlEvent: 0 play, 1 pause, 3 next, 4 previous, 5 volume up, 6 volume down
+    log("watch music control " + code);
+    if (code === 0) this.play(); else if (code === 1) this.pause();
+    else if (code === 3) this.next(); else if (code === 4) this.prev();
+    else if (code === 5) this.setVol(+$("#m-vol").value + 1); else if (code === 6) this.setVol(+$("#m-vol").value - 1);
+  },
+  tellWatch() { if (chCmd) send(Frames.musicInfo(!this.el.paused, $("#m-title").textContent), { quiet: true }); },
+  renderList() {
+    $("#m-list").innerHTML = this.tracks.map((t, k) => `<button class="item small" style="text-align:left;${k === this.i ? "border-color:var(--accent)" : ""}" data-k="${k}">${k === this.i ? "▶ " : ""}${t.name.replace(/</g, "&lt;")}</button>`).join("");
+    $$("#m-list [data-k]").forEach(b => b.addEventListener("click", () => { this.load(+b.dataset.k); this.play(); }));
+  },
+};
+Player.el.addEventListener("play", () => { $("#m-play").textContent = "Pause"; Player.tellWatch(); });
+Player.el.addEventListener("pause", () => { $("#m-play").textContent = "Play"; Player.tellWatch(); });
+Player.el.addEventListener("ended", () => Player.next());
+Player.el.addEventListener("timeupdate", () => { if (Player.el.duration) $("#m-seek").value = Math.round(Player.el.currentTime / Player.el.duration * 1000); });
+$("#m-seek").addEventListener("input", e => { if (Player.el.duration) Player.el.currentTime = e.target.value / 1000 * Player.el.duration; });
+$("#m-play").addEventListener("click", () => Player.toggle());
+$("#m-next").addEventListener("click", () => Player.next());
+$("#m-prev").addEventListener("click", () => Player.prev());
+$("#m-vol").addEventListener("change", e => Player.setVol(+e.target.value));
+$("#m-files").addEventListener("change", e => Player.add(Array.from(e.target.files)));
+Player.el.volume = 0.7;
+
+// ---------- Camera remote ----------
+const Cam = {
+  stream: null,
+  async open() {
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      const v = $("#c-video"); v.srcObject = this.stream; v.hidden = false; await v.play();
+      $("#c-shoot").disabled = false; $("#c-open").textContent = "Close camera";
+      if (chCmd) send(Frames.camera(), { quiet: true });
+    } catch (e) { toast("Camera unavailable: " + e.message); }
+  },
+  close() { this.stream && this.stream.getTracks().forEach(t => t.stop()); this.stream = null; $("#c-video").hidden = true; $("#c-shoot").disabled = true; $("#c-open").textContent = "Open camera"; },
+  shoot(src) {
+    const v = $("#c-video"); if (!this.stream || !v.videoWidth) { if (src === "watch") toast("Watch shutter pressed: open the camera first"); return; }
+    const c = document.createElement("canvas"); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext("2d").drawImage(v, 0, 0);
+    const url = c.toDataURL("image/jpeg", 0.9), a = document.createElement("a");
+    a.href = url; a.download = "watch-photo-" + Date.now() + ".jpg"; a.innerHTML = `<img src="${url}" alt="Photo">`;
+    $("#c-shots").prepend(a); toast(src === "watch" ? "Photo taken from the watch" : "Photo taken");
+  },
+};
+$("#c-open").addEventListener("click", () => (Cam.stream ? Cam.close() : Cam.open()));
+$("#c-shoot").addEventListener("click", () => Cam.shoot("button"));
+
+// ---------- Notes ----------
+const QUICK = ["On my way", "Drink water", "Call back later", "Meeting in 5 min"];
+$("#n-quick").innerHTML = QUICK.map(q => `<button class="small">${q}</button>`).join("");
+$$("#n-quick button").forEach(b => b.addEventListener("click", () => { $("#n-title").value = "Note"; $("#n-body").value = b.textContent; }));
+function renderNotes() {
+  const notes = store.get("notes", []);
+  $("#n-saved").innerHTML = notes.length ? notes.map((n, k) => `<div class="item"><div class="t"><span>${esc(n.t)}</span>
+    <span class="row" style="gap:6px"><button class="small" data-send="${k}">Send</button><button class="small" data-del="${k}">✕</button></span></div>
+    <div class="s">${esc(n.b)}</div></div>`).join("") : `<div class="empty">No saved notes.</div>`;
+  $$("#n-saved [data-send]").forEach(b => b.addEventListener("click", () => { const n = store.get("notes", [])[b.dataset.send]; send(Frames.notify(n.t, n.b)); }));
+  $$("#n-saved [data-del]").forEach(b => b.addEventListener("click", () => { const n = store.get("notes", []); n.splice(b.dataset.del, 1); store.set("notes", n); renderNotes(); }));
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+$("#n-save").addEventListener("click", () => { const n = store.get("notes", []); n.unshift({ t: $("#n-title").value || "Note", b: $("#n-body").value }); store.set("notes", n.slice(0, 30)); renderNotes(); toast("Saved"); });
+
+// ---------- Alarms ----------
+const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+let alarms = store.get("alarms", [{ on: true, h: 7, m: 0, days: [false, true, true, true, true, true, false] }]);
+function renderAlarms() {
+  $("#a-list").innerHTML = alarms.length ? alarms.map((a, k) => `<div class="alarm">
+    <input type="checkbox" data-on="${k}" ${a.on ? "checked" : ""} aria-label="Alarm on">
+    <div class="row" style="justify-content:space-between"><input type="time" data-t="${k}" value="${String(a.h).padStart(2, "0")}:${String(a.m).padStart(2, "0")}">
+      <button class="small" data-x="${k}">Remove</button></div>
+    <span></span><div class="days">${DAYS.map((d, i) => `<label><input type="checkbox" data-d="${k},${i}" ${a.days[i] ? "checked" : ""}><span>${d}</span></label>`).join("")}</div>
+  </div>`).join("") : `<div class="empty">No alarms.</div>`;
+  $$("[data-on]").forEach(e => e.addEventListener("change", () => { alarms[e.dataset.on].on = e.checked; store.set("alarms", alarms); }));
+  $$("[data-t]").forEach(e => e.addEventListener("change", () => { const [h, m] = parseHM(e.value); Object.assign(alarms[e.dataset.t], { h, m }); store.set("alarms", alarms); }));
+  $$("[data-d]").forEach(e => e.addEventListener("change", () => { const [k, i] = e.dataset.d.split(",").map(Number); alarms[k].days[i] = e.checked; store.set("alarms", alarms); }));
+  $$("[data-x]").forEach(e => e.addEventListener("click", () => { alarms.splice(+e.dataset.x, 1); store.set("alarms", alarms); renderAlarms(); }));
+}
+$("#a-add").addEventListener("click", () => { if (alarms.length >= 8) return toast("The watch holds 8 alarms"); alarms.push({ on: true, h: 8, m: 0, days: [true, true, true, true, true, true, true] }); store.set("alarms", alarms); renderAlarms(); });
+
+// ---------- Weather ----------
+// The official app took icon codes from its (now offline) server, so the icon list is numbered, not named.
+$("#wx-code").innerHTML = Array.from({ length: 32 }, (_, i) => `<option value="${i}">Icon ${i}</option>`).join("");
+$("#wx-auto").addEventListener("click", () => {
+  if (!navigator.geolocation) return toast("Location isn't available here");
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      const q = `latitude=${pos.coords.latitude.toFixed(2)}&longitude=${pos.coords.longitude.toFixed(2)}`;
+      const j = await (await fetch(`https://api.open-meteo.com/v1/forecast?${q}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto`)).json();
+      $("#wx-now").value = Math.round(j.current.temperature_2m); $("#wx-hi").value = Math.round(j.daily.temperature_2m_max[0]);
+      $("#wx-lo").value = Math.round(j.daily.temperature_2m_min[0]);
+      toast("Temperatures filled in. Pick an icon, then tap Send weather.");
+    } catch (e) { toast("Couldn't get the forecast"); }
+  }, () => toast("Location permission denied"));
+});
+
+// ---------- Settings persistence ----------
+const SETTINGS_IDS = ["s-timefmt", "s-units", "s-bright", "s-raise", "p-sex", "p-age", "p-h", "p-w", "p-goal", "s-hrauto", "s-hrhi", "s-hrlo",
+  "r-sit", "r-sitmin", "r-sitfrom", "r-sitto", "r-noon", "d-on", "d-from", "d-to", "wx-now", "wx-lo", "wx-hi", "wx-code"];
+const savedS = store.get("settings", {});
+SETTINGS_IDS.forEach(id => { const e = document.getElementById(id); if (savedS[id] === undefined) return; e.type === "checkbox" ? (e.checked = savedS[id]) : (e.value = savedS[id]); });
+SETTINGS_IDS.forEach(id => document.getElementById(id).addEventListener("change", () => {
+  const s = {}; SETTINGS_IDS.forEach(i => { const e = document.getElementById(i); s[i] = e.type === "checkbox" ? e.checked : e.value; }); store.set("settings", s);
+}));
+const val = id => +document.getElementById(id).value, chk = id => document.getElementById(id).checked;
+
+// ---------- Actions ----------
+const ACTIONS = {
+  syncAll, find: () => send(Frames.findDevice()),
+  async syncWorkouts() { const n = await syncWorkouts(); renderHistory(); toast(n ? `${n} workouts synced` : "No new workouts"); },
+  async measureHr() {
+    $("#t-hrk").textContent = "measuring… keep still";
+    const r = await send(Frames.liveHr(), { quiet: true });          // latest value now, and the watch starts a fresh reading
+    if (!r) return toast("Heart rate: no reply");
+    await sleep(12000);
+    await send(Frames.liveHr(), { quiet: true });                    // read again once the fresh reading is done
+  },
+  bind: () => { toast("Accept the request on the watch"); return send(Frames.bind(), { timeout: 20000 }); },
+  async setup() { await send(Frames.defaults(undefined, undefined, store.get("profile", {}).goal || 8000)); await send(Frames.query(2), { quiet: true }); },
+  notify: () => send(Frames.notify(($("#n-title").value || "Note").trim(), ($("#n-body").value || " ").trim())),
+  musicTitle: () => send(Frames.musicInfo(true, $("#m-custom").value)),
+  async saveDisplay() {
+    await send(Frames.timeFormat(val("s-timefmt")), { quiet: true }); await send(Frames.metric(val("s-units")), { quiet: true });
+    await send(Frames.brightTime(val("s-bright")), { quiet: true }); await send(Frames.raiseToWake(chk("s-raise")));
+  },
+  async saveProfile() {
+    const p = { sex: val("p-sex"), age: val("p-age"), height: val("p-h"), weight: val("p-w"), goal: val("p-goal") };
+    store.set("profile", p); renderToday();
+    await send(Frames.userInfo(p), { quiet: true }); await send(Frames.sportTarget(p.goal));
+  },
+  async saveHealth() {
+    await send(Frames.hrSlot(), { quiet: true }); await send(Frames.autoHr(chk("s-hrauto")), { quiet: true });
+    await send(Frames.hrWarning(val("s-hrhi"), val("s-hrlo")));
+  },
+  async saveSit() {
+    const [sh, sm] = parseHM($("#r-sitfrom").value), [eh, em] = parseHM($("#r-sitto").value);
+    await send(Frames.longSit(val("r-sitmin"), sh, sm, eh, em), { quiet: true }); await send(Frames.sitSwitch(chk("r-sit"), chk("r-noon")));
+  },
+  drink: () => send(Frames.drink()),
+  async saveDnd() {
+    const [sh, sm] = parseHM($("#d-from").value), [eh, em] = parseHM($("#d-to").value);
+    await send(Frames.dnd(sh, sm, eh, em), { quiet: true }); await send(Frames.dndSwitch(chk("d-on")));
+  },
+  saveAlarms: () => send(Frames.alarms(alarms)),
+  weather: () => send(Frames.weather([{ code: val("wx-code"), now: val("wx-now"), lo: val("wx-lo"), hi: val("wx-hi") }])),
+};
+$$("[data-act]").forEach(b => b.addEventListener("click", async () => {
+  if (!chCmd) return toast("Connect the watch first");
+  b.disabled = true;
+  try { await ACTIONS[b.dataset.act](); } catch (e) { log(b.dataset.act + ": " + e); toast(e.message); }
+  finally { b.disabled = false; }
+}));
+
+// ---------- Theme ----------
+function applyTheme(t) {
+  if (t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme");
+  $$("#theme-seg button").forEach(b => b.classList.toggle("on", b.dataset.th === (t || "")));
+}
+$$("#theme-seg button").forEach(b => b.addEventListener("click", () => { store.set("theme", b.dataset.th); applyTheme(b.dataset.th); }));
+applyTheme(store.get("theme", ""));
+
+// ---------- Start ----------
+if (!navigator.bluetooth) { $("#unsupported").hidden = false; $("#b-connect").disabled = true; }
+$("#b-connect").addEventListener("click", connect);
+renderAll(); renderAlarms(); renderNotes();
+</script>
+</body>
+</html>
