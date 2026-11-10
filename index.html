@@ -892,15 +892,25 @@ function handleFrame(r) {
   }
 }
 
+let manualDisconnect = false;
+function useDevice(d) {
+  if (dev === d) return;
+  dev = d;
+  dev.addEventListener("gattserverdisconnected", onDisconnect);
+}
 async function connect(e, showAll = false) {
-  if (dev && dev.gatt.connected) { dev.gatt.disconnect(); return; }
+  if (dev && dev.gatt.connected) { manualDisconnect = true; dev.gatt.disconnect(); return; }
   unlockAudio();
+  manualDisconnect = false;
+  // Watch already known this session: reconnect straight away, no device list
+  if (dev && !showAll) {
+    try { await openGatt(); return; } catch (err) { log("quick reconnect: " + err); }
+  }
   try {
     setState("Choose…", "busy");
-    dev = await navigator.bluetooth.requestDevice(showAll
+    useDevice(await navigator.bluetooth.requestDevice(showAll
       ? { acceptAllDevices: true, optionalServices: [SVC] }
-      : { filters: [{ namePrefix: "SOUNDPEATS" }, { services: [SVC] }], optionalServices: [SVC] });
-    dev.addEventListener("gattserverdisconnected", onDisconnect);
+      : { filters: [{ namePrefix: "SOUNDPEATS" }, { services: [SVC] }], optionalServices: [SVC] }));
     await openGatt();
   } catch (err) {
     setState("Offline", ""); log("connect: " + err);
@@ -919,6 +929,7 @@ async function openGatt() {
   await chAck.startNotifications();
   setState(dev.name ? dev.name.replace("SOUNDPEATS ", "") : "Connected", "on");
   $("#b-connect").textContent = "Disconnect"; $("#b-connect").classList.remove("primary");
+  store.set("lastDevice", { id: dev.id, name: dev.name || "" });
   await send(Frames.query(2), { quiet: true });
   await send(Frames.query(40), { quiet: true });
   await send(Frames.liveHr(), { quiet: true });   // replies at once with the latest, lowest and highest heart rate today
@@ -927,7 +938,7 @@ let reconnecting = false;
 async function onDisconnect() {
   chCmd = null; setState("Offline", ""); $("#b-connect").textContent = "Connect"; $("#b-connect").classList.add("primary");
   log("link lost");
-  if (reconnecting || !dev) return;
+  if (manualDisconnect || reconnecting || !dev) return;
   reconnecting = true;
   for (let i = 0; i < 3 && dev && !dev.gatt.connected; i++) {
     await sleep(2000 * (i + 1));
@@ -935,6 +946,32 @@ async function onDisconnect() {
   }
   reconnecting = false;
 }
+
+// Reconnect on open to the watch used last time, where the browser remembers permitted devices
+// (navigator.bluetooth.getDevices). Otherwise one tap on Connect does it.
+let autoTrying = false;
+async function autoConnect() {
+  if (autoTrying || (dev && dev.gatt.connected) || manualDisconnect || !navigator.bluetooth || !navigator.bluetooth.getDevices) return;
+  const last = store.get("lastDevice", null);
+  if (!last) return;
+  autoTrying = true;
+  try {
+    const known = await navigator.bluetooth.getDevices();
+    const d = known.find(x => x.id === last.id) || known.find(x => /SOUNDPEATS/i.test(x.name || ""));
+    if (!d) return;
+    useDevice(d);
+    setState("Reconnecting…", "busy");
+    try { await openGatt(); toast("Connected to your watch"); return; } catch (e) { log("auto connect: " + e); }
+    // Not in range yet: wait for the watch to show up, then connect
+    if (d.watchAdvertisements) {
+      const ac = new AbortController();
+      d.addEventListener("advertisementreceived", async () => { ac.abort(); try { await openGatt(); toast("Connected to your watch"); } catch (e) { log("auto connect: " + e); setState("Offline", ""); } }, { once: true });
+      try { await d.watchAdvertisements({ signal: ac.signal }); setState("Looking for watch…", "busy"); } catch { setState("Offline", ""); }
+    } else setState("Offline", "");
+  } catch (e) { log("auto connect: " + e); setState("Offline", ""); }
+  finally { autoTrying = false; }
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoConnect(); });
 
 // ---------- Today ----------
 function applySteps(s) {
@@ -1465,6 +1502,7 @@ if (!navigator.bluetooth) { $("#unsupported").hidden = false; $("#b-connect").di
 $("#b-connect").addEventListener("click", connect);
 $("#b-showall").addEventListener("click", e => { e.preventDefault(); connect(e, true); });
 renderAll(); renderAlarms(); renderNotes(); renderRun();
+autoConnect();
 </script>
 </body>
 </html>
